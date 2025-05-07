@@ -4,18 +4,27 @@ import 'package:flutter/material.dart';
 import '../services/servicioEmergencia.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class EmergencyDirectoryScreen extends StatelessWidget {
+class EmergencyDirectoryScreen extends StatefulWidget {
   const EmergencyDirectoryScreen({super.key});
 
+  @override
+  State<EmergencyDirectoryScreen> createState() =>
+      _EmergencyDirectoryScreenState();
+}
+
+class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
+  final EmergencyService emergencyService = EmergencyService();
+
   void _makeCall(String phoneNumber, BuildContext context) async {
-    final String sanitizedPhoneNumber = phoneNumber.replaceAll(RegExp(r'[()\s]'), '');
+    final String sanitizedPhoneNumber =
+        phoneNumber.replaceAll(RegExp(r'[()\s]'), '');
     final Uri callUri = Uri(scheme: 'tel', path: sanitizedPhoneNumber);
     try {
       if (await canLaunchUrl(callUri)) {
         await launchUrl(callUri);
       } else {
         if (context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('No se pudo iniciar la llamada a $phoneNumber'),
               backgroundColor: Colors.red,
@@ -25,31 +34,90 @@ class EmergencyDirectoryScreen extends StatelessWidget {
         debugPrint('No se pudo lanzar $callUri');
       }
     } catch (e) {
-       if (context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al intentar llamar: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-       }
-       debugPrint('Error al lanzar $callUri: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al intentar llamar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      debugPrint('Error al lanzar $callUri: $e');
     }
+  }
+
+  Future<void> _showAddContactDialog(BuildContext context) async {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Agregar Contacto'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(labelText: 'Teléfono'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: Navigator.of(context).pop,
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                final phone = phoneController.text.trim();
+                if (name.isNotEmpty && phone.isNotEmpty) {
+                  emergencyService.addEmergencyContact(
+                    name: name,
+                    phone: phone,
+                    icon: Icons.person_add_alt_1,
+                    isPersonal: true,
+                  );
+
+                  if (context.mounted) {
+                    setState(() {}); // Recargar UI
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('$name agregado correctamente'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    Navigator.of(context).pop(); // Cerrar diálogo
+                  }
+                }
+              },
+              child: const Text('Agregar'),
+            )
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final contacts = EmergencyService.getEmergencyContacts();
+    final contacts = emergencyService.getEmergencyContacts();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-            'Directorio de Emergencia',
-             style: TextStyle(
-                 color: Colors.white,
-                 fontWeight: FontWeight.bold
-             )
+          'Directorio de Emergencia',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: theme.primaryColor,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -61,22 +129,23 @@ class EmergencyDirectoryScreen extends StatelessWidget {
         itemCount: contacts.length,
         itemBuilder: (context, index) {
           final contact = contacts[index];
-          final IconData iconData = contact['icon'] as IconData? ?? Icons.contact_phone;
+          final IconData iconData =
+              contact['icon'] as IconData? ?? Icons.contact_phone;
 
           return Card(
             elevation: 2.0,
-            margin: EdgeInsets.zero, // Margin is handled by separator padding or bottom margin of Card
+            margin: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12.0),
             ),
             child: ListTile(
               leading: CircleAvatar(
-                  backgroundColor: theme.primaryColor.withOpacity(0.1),
-                  child: Icon(
-                    iconData,
-                    color: theme.primaryColor,
-                    size: 24,
-                  ),
+                backgroundColor: theme.primaryColor.withOpacity(0.1),
+                child: Icon(
+                  iconData,
+                  color: theme.primaryColor,
+                  size: 24,
+                ),
               ),
               title: Text(
                 contact['name']!,
@@ -102,12 +171,12 @@ class EmergencyDirectoryScreen extends StatelessWidget {
                 tooltip: 'Llamar a ${contact['name']}',
                 onPressed: () => _makeCall(contact['phone']!, context),
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
             ),
           );
         },
         separatorBuilder: (context, index) {
-          // Check if the *next* item is personal and the current one is not
           bool nextIsPersonal = false;
           if (index + 1 < contacts.length) {
             nextIsPersonal = contacts[index + 1]['isPersonal'] == true;
@@ -115,20 +184,24 @@ class EmergencyDirectoryScreen extends StatelessWidget {
           bool currentIsPersonal = contacts[index]['isPersonal'] == true;
 
           if (!currentIsPersonal && nextIsPersonal) {
-            // Add a Divider with padding before the personal contact section
             return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0), // Padding around divider
+              padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
               child: Divider(
                 height: 1,
                 thickness: 1,
-                color: Colors.black26, // Slightly visible divider color
+                color: Colors.black26,
               ),
             );
           } else {
-            // Standard vertical space between cards
             return const SizedBox(height: 12.0);
           }
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddContactDialog(context),
+        label: const Text('Agregar'),
+        icon: const Icon(Icons.add),
+        backgroundColor: theme.primaryColor,
       ),
     );
   }

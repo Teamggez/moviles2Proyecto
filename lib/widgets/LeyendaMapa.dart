@@ -5,15 +5,16 @@ class LeyendaMapa extends StatefulWidget {
   final VoidCallback onClose;
 
   const LeyendaMapa({
-    Key? key,
+    super.key,
     required this.onClose,
-  }) : super(key: key);
+  });
 
   @override
   State<LeyendaMapa> createState() => _LeyendaMapaState();
 }
 
-class _LeyendaMapaState extends State<LeyendaMapa> with SingleTickerProviderStateMixin {
+class _LeyendaMapaState extends State<LeyendaMapa>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -27,12 +28,11 @@ class _LeyendaMapaState extends State<LeyendaMapa> with SingleTickerProviderStat
     );
 
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack)
-    );
+        CurvedAnimation(
+            parent: _animationController, curve: Curves.easeOutBack));
 
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn)
-    );
+        CurvedAnimation(parent: _animationController, curve: Curves.easeIn));
 
     _animationController.forward();
   }
@@ -60,7 +60,8 @@ class _LeyendaMapaState extends State<LeyendaMapa> with SingleTickerProviderStat
             scale: _scaleAnimation.value,
             child: Card(
               elevation: 10,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
               color: Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
@@ -80,7 +81,8 @@ class _LeyendaMapaState extends State<LeyendaMapa> with SingleTickerProviderStat
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, size: 22, color: Colors.black54),
+                          icon: const Icon(Icons.close,
+                              size: 22, color: Colors.black54),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
                           onPressed: _cerrarLeyenda,
@@ -100,19 +102,22 @@ class _LeyendaMapaState extends State<LeyendaMapa> with SingleTickerProviderStat
                     _buildLeyendaItem(
                       color: Colors.red.withOpacity(0.6),
                       texto: 'Zona Peligrosa',
-                      descripcion: 'Alto riesgo de incidentes. Se recomienda evitar estas áreas, especialmente durante la noche.',
+                      descripcion:
+                          'Alto riesgo de incidentes. Se recomienda evitar estas áreas, especialmente durante la noche.',
                     ),
                     const SizedBox(height: 16),
                     _buildLeyendaItem(
                       color: Colors.orange.withOpacity(0.6),
                       texto: 'Zona de Riesgo Medio',
-                      descripcion: 'Precaución recomendada. Manténgase alerta y evite mostrar objetos de valor.',
+                      descripcion:
+                          'Precaución recomendada. Manténgase alerta y evite mostrar objetos de valor.',
                     ),
                     const SizedBox(height: 16),
                     _buildLeyendaItem(
                       color: Colors.green.withOpacity(0.6),
                       texto: 'Zona Segura',
-                      descripcion: 'Bajo riesgo de incidentes. Áreas generalmente seguras con buena vigilancia.',
+                      descripcion:
+                          'Bajo riesgo de incidentes. Áreas generalmente seguras con buena vigilancia.',
                     ),
                     const SizedBox(height: 20),
                     const Divider(height: 24, thickness: 1),
