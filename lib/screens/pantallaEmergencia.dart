@@ -1,5 +1,3 @@
-// EmergencyDirectoryScreen.dart
-
 import 'package:flutter/material.dart';
 import '../services/servicioEmergencia.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -105,6 +103,11 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
     );
   }
 
+  void _deleteContact(int index) {
+    emergencyService.deleteEmergencyContact(index);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -162,14 +165,30 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
                   color: Colors.grey[600],
                 ),
               ),
-              trailing: IconButton(
-                icon: Icon(
-                  Icons.call_outlined,
-                  color: theme.primaryColor,
-                  size: 28,
-                ),
-                tooltip: 'Llamar a ${contact['name']}',
-                onPressed: () => _makeCall(contact['phone']!, context),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.call_outlined,
+                      color: theme.primaryColor,
+                      size: 28,
+                    ),
+                    tooltip: 'Llamar a ${contact['name']}',
+                    onPressed: () => _makeCall(contact['phone']!, context),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete,
+                      color: Colors.red,
+                      size: 28,
+                    ),
+                    tooltip: 'Eliminar contacto',
+                    onPressed: () {
+                      _deleteContact(index);
+                    },
+                  ),
+                ],
               ),
               contentPadding:
                   const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),

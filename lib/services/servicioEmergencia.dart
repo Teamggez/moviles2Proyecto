@@ -88,6 +88,10 @@ class EmergencyService {
         _emergencyContacts); // Retorna copia para evitar modificaciones externas
   }
 
+  void deleteEmergencyContact(int index) {
+    _emergencyContacts.removeAt(index);
+  }
+
   void addEmergencyContact({
     required String name,
     required String phone,
