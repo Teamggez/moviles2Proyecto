@@ -70,12 +70,6 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
       return;
     }
 
-    if (!isHeatmapEnabled) {
-        if (isPopupVisible) {
-            _closePopup();
-            }
-            return;
-    }
 
     setState(() {
       tapPosition = position;
@@ -329,7 +323,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
               );
             },
           ),
-          if (isHeatmapEnabled && isPopupVisible && riskLevel != null)
+          if (isPopupVisible && riskLevel != null)
             Positioned(
               bottom: 20,
               left: 10,
