@@ -1,0 +1,2 @@
+C:/Users/cisco/OneDrive/Documentos/Cursos UPT/Moviles/moviles2Proyecto/android/app/.cxx/Debug/571o20x5/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/cisco/OneDrive/Documentos/Cursos UPT/Moviles/moviles2Proyecto/android/app/.cxx/Debug/571o20x5/armeabi-v7a/CMakeFiles/rebuild_cache.dir

@@ -19,6 +19,9 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
   bool isPopupVisible = false;
   bool isLeyendaVisible = false;
 
+  bool isHeatmapEnabled = true;
+
+
   LatLng? tapPosition;
   Set<Circle> circles = {};
 
@@ -65,6 +68,13 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
         isLeyendaVisible = false;
       });
       return;
+    }
+
+    if (!isHeatmapEnabled) {
+        if (isPopupVisible) {
+            _closePopup();
+            }
+            return;
     }
 
     setState(() {
@@ -136,6 +146,27 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
       isLeyendaVisible = false;
     });
   }
+
+  void _toggleHeatmap() {
+      setState(() {
+        isHeatmapEnabled = !isHeatmapEnabled;
+        if (!isHeatmapEnabled) {
+          circles.clear();
+          if (isPopupVisible) {
+             _animationController.reverse().then((_) {
+              if (mounted) {
+                setState(() {
+                  isPopupVisible = false;
+                });
+              }
+            });
+          } else {
+             isPopupVisible = false;
+          }
+          riskLevel = null;
+        }
+      });
+    }
 
   void _handleLogout() {
     Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -222,6 +253,32 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
               ),
             ),
           ),
+
+          Positioned(
+                      top: 100,
+                      right: 20,
+                      child: SafeArea(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(217),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(51),
+                                blurRadius: 5,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            icon: Icon(isHeatmapEnabled ? Icons.layers_clear_outlined : Icons.layers_outlined),
+                            color: Colors.black54,
+                            tooltip: isHeatmapEnabled ? 'Desactivar Zonas de Riesgo' : 'Activar Zonas de Riesgo',
+                            onPressed: _toggleHeatmap,
+                          ),
+                        ),
+                      ),
+                    ),
           AnimatedBuilder(
             animation: _buttonAnimation,
             builder: (context, child) {
@@ -272,7 +329,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
               );
             },
           ),
-          if (isPopupVisible && riskLevel != null)
+          if (isHeatmapEnabled && isPopupVisible && riskLevel != null)
             Positioned(
               bottom: 20,
               left: 10,
