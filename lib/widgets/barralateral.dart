@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/reporteformulario.dart';
 
 class BarraLateral extends StatelessWidget {
   final VoidCallback onLogout;
@@ -25,7 +26,27 @@ class BarraLateral extends StatelessWidget {
               ],
             ),
           ),
+          
+          // Elemento para reportar incidente (ahora navega directamente)
+          ListTile(
+            leading: const Icon(Icons.add_circle, color: Colors.blue),
+            title: const Text('Reportar Incidente', 
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onTap: () {
+              Navigator.pop(context); // Cierra el drawer
+              // Navega directamente al formulario de reporte
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ReporteFormularioScreen(),
+                ),
+              );
+            },
+          ),
 
+          const Divider(),
+          
           ListTile(
             leading: const Icon(Icons.warning_amber),
             title: const Text('Desactivar Alerta'),
