@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:convert'; // <--- AÑADE ESTA LÍNEA
+import 'package:http/http.dart' as http; // <--- AÑADE ESTA LÍNEA
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+// import 'package:firebase_storage/firebase_storage.dart'; // <--- YA NO SE NECESITA PARA IMÁGENES
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+
+// Define tu API Key de ImgBB
+const String imgbbApiKey = '9e7f6853238e0d417d67f2c7c3d87282';
 
 class ReporteFormularioScreen extends StatefulWidget {
   const ReporteFormularioScreen({super.key});
@@ -27,7 +32,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
   Position? _currentPosition;
   String _locationAddress = "Obteniendo ubicación...";
 
-  // Categorías actualizadas
   final List<Map<String, dynamic>> _categories = [
     {'id': 'accident', 'name': 'Accidente', 'icon': Icons.car_crash, 'color': Colors.red},
     {'id': 'fire', 'name': 'Incendio', 'icon': Icons.local_fire_department, 'color': Colors.orange},
@@ -41,21 +45,9 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
   ];
 
   final Map<String, Map<String, dynamic>> _riskLevels = {
-    'low': {
-      'name': 'Poco riesgo',
-      'color': Colors.green,
-      'icon': Icons.warning,
-    },
-    'medium': {
-      'name': 'Riesgo moderado',
-      'color': Colors.orange,
-      'icon': Icons.warning,
-    },
-    'high': {
-      'name': 'Alto riesgo',
-      'color': Colors.red,
-      'icon': Icons.warning,
-    },
+    'low': {'name': 'Poco riesgo', 'color': Colors.green, 'icon': Icons.warning},
+    'medium': {'name': 'Riesgo moderado', 'color': Colors.orange, 'icon': Icons.warning},
+    'high': {'name': 'Alto riesgo', 'color': Colors.red, 'icon': Icons.warning},
   };
 
   @override
@@ -64,7 +56,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
     _getCurrentLocation();
   }
 
-  // --- INICIO DE CAMBIOS ---
   Future<void> _getCurrentLocation() async {
     setState(() {
       _isLocationLoading = true;
@@ -74,7 +65,7 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
     final hasPermission = await _handleLocationPermission();
     
     if (!hasPermission) {
-      if (mounted) { // Check if the widget is still in the tree
+      if (mounted) {
         setState(() {
           _isLocationLoading = false;
           _locationAddress = "No se pudo acceder a la ubicación";
@@ -84,11 +75,9 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
     }
 
     try {
-      // Verificar si los servicios de ubicación están habilitados
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        // Mostrar diálogo para habilitar ubicación
-        if (mounted) _showLocationServicesDialog(); // Check mounted before showing dialog
+        if (mounted) _showLocationServicesDialog();
         if (mounted) {
           setState(() {
             _isLocationLoading = false;
@@ -98,13 +87,12 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
         return;
       }
 
-      // Intentar obtener la ubicación con timeout
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 15),
       ).catchError((e) {
         print("Error obteniendo ubicación: $e");
-        throw e; // Re-throw para que el catch exterior lo maneje
+        throw e;
       });
 
       if (mounted) {
@@ -121,7 +109,7 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
       if (mounted) {
         setState(() {
           _isLocationLoading = false;
-          _locationAddress = "Error al obtener ubicación"; // Simplificado para el usuario
+          _locationAddress = "Error al obtener ubicación";
         });
       }
     }
@@ -129,18 +117,14 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
 
   Future<bool> _handleLocationPermission() async {
     LocationPermission permission;
-
-    // Verificar si los servicios de ubicación están habilitados
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) _showLocationServicesDialog();
       return false;
     }
 
-    // Verificar permisos actuales
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      // Solicitar permisos
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         if (mounted) {
@@ -153,32 +137,23 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
     }
 
     if (permission == LocationPermission.deniedForever) {
-      // Mostrar diálogo para abrir configuración
       if (mounted) _showAppSettingsDialog();
       return false;
     }
-
     return true;
   }
 
   void _showLocationServicesDialog() {
-    if (!mounted) return; // Evitar mostrar diálogo si el widget no está montado
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Servicios de ubicación desactivados'),
-          content: const Text(
-            'Para obtener la ubicación del incidente, necesitas activar los servicios de ubicación en tu dispositivo.',
-          ),
+          content: const Text('Para obtener la ubicación del incidente, necesitas activar los servicios de ubicación en tu dispositivo.'),
           actions: <Widget>[
-            TextButton(
-              child: const Text('Cancelar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
+            TextButton(child: const Text('Cancelar'), onPressed: () => Navigator.of(context).pop()),
             TextButton(
               child: const Text('Abrir Configuración'),
               onPressed: () {
@@ -193,23 +168,16 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
   }
 
   void _showAppSettingsDialog() {
-    if (!mounted) return; // Evitar mostrar diálogo si el widget no está montado
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Permisos de ubicación'),
-          content: const Text(
-            'Los permisos de ubicación están permanentemente denegados. Por favor, habilítalos en la configuración de la aplicación.',
-          ),
+          content: const Text('Los permisos de ubicación están permanentemente denegados. Por favor, habilítalos en la configuración de la aplicación.'),
           actions: <Widget>[
-            TextButton(
-              child: const Text('Cancelar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
+            TextButton(child: const Text('Cancelar'), onPressed: () => Navigator.of(context).pop()),
             TextButton(
               child: const Text('Abrir Configuración'),
               onPressed: () {
@@ -222,8 +190,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
       },
     );
   }
-  // --- FIN DE CAMBIOS ---
-
 
   Future<void> _pickImage(ImageSource source) async {
     if (_images.length >= 5) {
@@ -249,9 +215,7 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (BuildContext context) {
         return SafeArea(
           child: Padding(
@@ -259,33 +223,13 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Seleccionar imagen desde',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                const Text('Seleccionar imagen desde', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildImageSourceOption(
-                      icon: Icons.camera_alt,
-                      title: 'Cámara',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImage(ImageSource.camera);
-                      },
-                    ),
-                    _buildImageSourceOption(
-                      icon: Icons.photo_library,
-                      title: 'Galería',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImage(ImageSource.gallery);
-                      },
-                    ),
+                    _buildImageSourceOption(icon: Icons.camera_alt, title: 'Cámara', onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); }),
+                    _buildImageSourceOption(icon: Icons.photo_library, title: 'Galería', onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery); }),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -297,36 +241,18 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
     );
   }
 
-  Widget _buildImageSourceOption({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildImageSourceOption({required IconData icon, required String title, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
           Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 30,
-              color: Colors.indigo[700],
-            ),
+            width: 60, height: 60,
+            decoration: BoxDecoration(color: Colors.grey[200], shape: BoxShape.circle),
+            child: Icon(icon, size: 30, color: Colors.indigo[700]),
           ),
           const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -340,24 +266,55 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
     }
   }
 
+  // --- FUNCIÓN _uploadImages MODIFICADA PARA USAR ImgBB ---
   Future<List<String>> _uploadImages() async {
     List<String> imageUrls = [];
+    final uri = Uri.parse('https://api.imgbb.com/1/upload');
 
-    for (var image in _images) {
-      String fileName = '${const Uuid().v4()}.jpg';
-      Reference storageRef = FirebaseStorage.instance.ref().child('reportes_imagenes/$fileName');
-      
-      File file = File(image.path);
-      UploadTask uploadTask = storageRef.putFile(file);
-      
-      await uploadTask.whenComplete(() async {
-        String downloadUrl = await storageRef.getDownloadURL();
-        imageUrls.add(downloadUrl);
-      });
+    for (var imageXFile in _images) {
+      try {
+        var request = http.MultipartRequest('POST', uri);
+        request.fields['key'] = imgbbApiKey;
+        // Opcional: añadir expiración en segundos (ej. 7 días = 604800)
+        // request.fields['expiration'] = '604800'; 
+
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'image', // Este es el nombre del parámetro que espera la API de ImgBB
+            imageXFile.path,
+            filename: imageXFile.name, // El nombre del archivo es opcional pero bueno tenerlo
+          ),
+        );
+
+        var streamedResponse = await request.send();
+        var response = await http.Response.fromStream(streamedResponse);
+
+        if (response.statusCode == 200) {
+          var responseData = jsonDecode(response.body);
+          if (responseData['success'] == true && responseData['data'] != null && responseData['data']['url'] != null) {
+            imageUrls.add(responseData['data']['url']);
+            print('ImgBB Upload Success: ${responseData['data']['url']}');
+          } else {
+            // La API de ImgBB devolvió success:false o una estructura inesperada
+            print('ImgBB API Error: ${responseData['error']?['message'] ?? response.body}');
+            throw Exception('Error en la respuesta de la API de ImgBB: ${responseData['error']?['message'] ?? 'Respuesta inesperada'}');
+          }
+        } else {
+          // Error HTTP
+          print('ImgBB HTTP Error ${response.statusCode}: ${response.body}');
+          throw Exception('Error al subir imagen a ImgBB. Código: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('Excepción al subir la imagen ${imageXFile.name} a ImgBB: $e');
+        // Re-lanzar la excepción para que _submitForm la maneje
+        // Podrías decidir continuar sin esta imagen o fallar todo el reporte
+        throw Exception('Fallo al subir la imagen ${imageXFile.name}: $e');
+      }
     }
-
     return imageUrls;
   }
+  // --- FIN DE LA MODIFICACIÓN ---
+
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate() && _selectedCategory != null) {
@@ -370,7 +327,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
         return;
       }
 
-      // Validar título personalizado para categoría "Otros"
       if (_selectedCategory == 'others' && _customTitleController.text.trim().isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -386,23 +342,16 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
         });
       }
 
-
       try {
-        // Subir imágenes a Firebase Storage
+        // Subir imágenes (ahora usa ImgBB)
         List<String> imageUrls = await _uploadImages();
 
-        // Obtener la categoría seleccionada
-        final selectedCategoryData = _categories.firstWhere(
-          (category) => category['id'] == _selectedCategory,
-        );
-
-        // Determinar el nombre de la categoría (personalizado si es "Otros")
+        final selectedCategoryData = _categories.firstWhere((category) => category['id'] == _selectedCategory);
         String categoryName = selectedCategoryData['name'];
         if (_selectedCategory == 'others' && _customTitleController.text.trim().isNotEmpty) {
           categoryName = _customTitleController.text.trim();
         }
 
-        // Crear el documento para Firestore
         final reporteData = {
           'id': const Uuid().v4(),
           'tipo': _selectedCategory,
@@ -411,60 +360,33 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
           'descripcion': _descriptionController.text,
           'nivelRiesgo': _riskLevel,
           'nivelRiesgoNombre': _riskLevels[_riskLevel]!['name'],
-          'ubicacion': {
-            'latitud': _currentPosition!.latitude,
-            'longitud': _currentPosition!.longitude,
-          },
-          'imagenes': imageUrls,
+          'ubicacion': {'latitud': _currentPosition!.latitude, 'longitud': _currentPosition!.longitude},
+          'imagenes': imageUrls, // Estas URLs ahora son de ImgBB
           'fechaCreacion': FieldValue.serverTimestamp(),
           'fechaCreacionLocal': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
           'estado': 'Activo',
           'etapa': 'pendiente',
         };
 
-        // Guardar en Firestore
         await FirebaseFirestore.instance.collection('Reportes').add(reporteData);
 
         if (!mounted) return;
+        setState(() { _isSubmitting = false; });
 
-        setState(() {
-          _isSubmitting = false;
-        });
-
-        // Mostrar diálogo de éxito
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (BuildContext context) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 28),
-                  SizedBox(width: 10),
-                  Text('¡Reporte enviado!'),
-                ],
-              ),
-              content: const Text(
-                'Tu reporte ha sido enviado con éxito y está pendiente de verificación.',
-                style: TextStyle(fontSize: 16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(children: [Icon(Icons.check_circle, color: Colors.green, size: 28), SizedBox(width: 10), Text('¡Reporte enviado!')]),
+              content: const Text('Tu reporte ha sido enviado con éxito y está pendiente de verificación.', style: TextStyle(fontSize: 16)),
               actions: [
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                   onPressed: () {
                     Navigator.of(context).pop();
-                    if (Navigator.canPop(context)) { // Check if we can pop again
-                      Navigator.of(context).pop(); // Volver a la pantalla principal
-                    }
+                    if (Navigator.canPop(context)) { Navigator.of(context).pop(); }
                   },
                   child: const Text('Aceptar'),
                 ),
@@ -474,9 +396,7 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
         );
       } catch (e) {
         if (mounted) {
-          setState(() {
-            _isSubmitting = false;
-          });
+          setState(() { _isSubmitting = false; });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error al enviar el reporte: $e')),
           );
@@ -515,6 +435,7 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
   }
 
   Widget _buildCategorySelector() {
+    // ... (sin cambios aquí)
     return SafeArea(
       child: Column(
         children: [
@@ -592,6 +513,7 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
   }
 
   Widget _buildReportForm() {
+    // ... (sin cambios aquí, excepto que las imágenes ahora se verán con FileImage)
     final selectedCategoryData = _categories.firstWhere(
       (category) => category['id'] == _selectedCategory,
     );
@@ -650,7 +572,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
               ),
             ),
             
-            // Campo de título personalizado para categoría "Otros"
             if (isOthersCategory) ...[
               const SizedBox(height: 16),
               const Text(
@@ -693,7 +614,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
             ],
             const SizedBox(height: 24),
 
-            // --- INICIO DE CAMBIO EN UI DE UBICACIÓN ---
             _buildSectionTitle('Ubicación'),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -729,14 +649,14 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Flexible( // Added Flexible to prevent overflow
+                                  Flexible( 
                                     child: Text(
                                       _locationAddress,
                                       style: const TextStyle(
                                         color: Colors.black87,
                                         fontSize: 14,
                                       ),
-                                      overflow: TextOverflow.ellipsis, // Handle long text
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
@@ -751,14 +671,13 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
                                       : Colors.red,
                                   fontSize: 14,
                                 ),
-                                overflow: TextOverflow.ellipsis, // Handle long text
+                                overflow: TextOverflow.ellipsis, 
                               ),
                       ),
-                      // Botón para actualizar ubicación
                       if (!_isLocationLoading)
                         IconButton(
                           icon: const Icon(Icons.refresh, color: Colors.blue),
-                          onPressed: _getCurrentLocation, // Llama a la función para refrescar
+                          onPressed: _getCurrentLocation,
                           tooltip: 'Actualizar ubicación',
                         ),
                     ],
@@ -785,10 +704,8 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
                 ],
               ),
             ),
-            // --- FIN DE CAMBIO EN UI DE UBICACIÓN ---
             const SizedBox(height: 24),
 
-            // Sección de descripción
             _buildSectionTitle('Descripción'),
             TextFormField(
               controller: _descriptionController,
@@ -821,7 +738,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Sección de imágenes
             _buildSectionTitle('Imágenes', trailing: '${_images.length}/5'),
             if (_images.isNotEmpty)
               Container(
@@ -841,7 +757,7 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.grey[300]!),
                             image: DecorationImage(
-                              image: FileImage(File(_images[index].path)),
+                              image: FileImage(File(_images[index].path)), // Se muestra la imagen local
                               fit: BoxFit.cover,
                             ),
                           ),
@@ -921,7 +837,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Sección de nivel de riesgo
             _buildSectionTitle('Nivel de Riesgo'),
             Row(
               children: _riskLevels.entries.map((entry) {
@@ -988,7 +903,6 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
             ),
             const SizedBox(height: 32),
 
-            // Botón de enviar
             ElevatedButton(
               onPressed: _isSubmitting ? null : _submitForm,
               style: ElevatedButton.styleFrom(
@@ -1046,6 +960,7 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
   }
 
   Widget _buildSectionTitle(String title, {String? trailing}) {
+    // ... (sin cambios aquí)
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(

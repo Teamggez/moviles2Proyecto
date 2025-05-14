@@ -44,7 +44,7 @@ class BarraLateral extends StatelessWidget {
               );
             },
           ),
-          
+
           const Divider(),
           
           ListTile(
