@@ -44,6 +44,66 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
     }
   }
 
+  Future<void> _showEditContactDialog(
+      BuildContext context, Map<String, dynamic> contact) async {
+    final nameController = TextEditingController(text: contact['name']);
+    final phoneController = TextEditingController(text: contact['phone']);
+
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Editar Contacto'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(labelText: 'Teléfono'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: Navigator.of(context).pop,
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                final phone = phoneController.text.trim();
+                if (name.isNotEmpty && phone.isNotEmpty) {
+                  emergencyService.updateEmergencyContact(
+                    id: contact['id'],
+                    name: name,
+                    phone: phone,
+                    icon: contact['icon'],
+                    isPersonal: contact['isPersonal'],
+                  );
+                  if (context.mounted) {
+                    setState(() {});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('$name actualizado correctamente'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    Navigator.of(context).pop();
+                  }
+                }
+              },
+              child: const Text('Guardar'),
+            )
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _showAddContactDialog(BuildContext context) async {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
@@ -176,6 +236,10 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
                     ),
                     tooltip: 'Llamar a ${contact['name']}',
                     onPressed: () => _makeCall(contact['phone']!, context),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.edit),
+                    onPressed: () => _showEditContactDialog(context, contact),
                   ),
                   IconButton(
                     icon: const Icon(

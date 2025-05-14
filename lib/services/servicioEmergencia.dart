@@ -115,6 +115,20 @@ class EmergencyService {
     nextId = _calculateNextId();
   }
 
+  void updateEmergencyContact({
+    required int id,
+    required String name,
+    required String phone,
+    required IconData icon,
+    required bool isPersonal,
+  }) {
+    final contact = _emergencyContacts.firstWhere((c) => c['id'] == id);
+    contact['name'] = name;
+    contact['phone'] = phone;
+    contact['icon'] = icon;
+    contact['isPersonal'] = isPersonal;
+  }
+
   void addEmergencyContact({
     required String name,
     required String phone,
