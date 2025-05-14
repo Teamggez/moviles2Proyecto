@@ -44,7 +44,7 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
     }
   }
 
-  Future<void> _showEditContactDialog(
+  Future<void> _showEditDialog(
       BuildContext context, Map<String, dynamic> contact) async {
     final nameController = TextEditingController(text: contact['name']);
     final phoneController = TextEditingController(text: contact['phone']);
@@ -171,7 +171,7 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final contacts = emergencyService.getEmergencyContacts();
+    final contacts = emergencyService.getEmergencyContacts(copy: false);
 
     return Scaffold(
       appBar: AppBar(
@@ -192,96 +192,30 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
         itemCount: contacts.length,
         itemBuilder: (context, index) {
           final contact = contacts[index];
-          final bool isLastItem = index == contacts.length - 1;
-          final bool currentIsPersonal = contact['isPersonal'] == true;
-          bool nextIsPersonal = false;
-          if (!isLastItem) {
-            nextIsPersonal = contacts[index + 1]['isPersonal'] == true;
-          }
-          final showSeparator = !currentIsPersonal && nextIsPersonal;
-
-          return Card(
+          return ListTile(
             key: ValueKey(contact['id']),
-            elevation: 2.0,
-            margin: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12.0),
-            ),
-            child: Column(
+            title: Text(contact['name']),
+            subtitle: Text(contact['phone']),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: theme.primaryColor.withOpacity(0.1),
-                    child: Icon(
-                      contact['icon'] as IconData? ?? Icons.contact_phone,
-                      color: theme.primaryColor,
-                      size: 24,
-                    ),
-                  ),
-                  title: Text(
-                    contact['name']!,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      color: Color(0xFF334155),
-                    ),
-                  ),
-                  subtitle: Text(
-                    contact['phone']!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.call_outlined,
-                          color: theme.primaryColor,
-                          size: 28,
-                        ),
-                        tooltip: 'Llamar a ${contact['name']}',
-                        onPressed: () => _makeCall(contact['phone']!, context),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.edit, color: Colors.blueGrey),
-                        onPressed: () =>
-                            _showEditContactDialog(context, contact),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete,
-                          color: Colors.red,
-                          size: 28,
-                        ),
-                        tooltip: 'Eliminar contacto',
-                        onPressed: () => _deleteContact(contact['id']),
-                      ),
-                    ],
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                      vertical: 10.0, horizontal: 16.0),
-                ),
-                if (showSeparator)
-                  const Padding(
-                    padding:
-                        EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
-                    child: Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: Colors.black26,
-                    ),
-                  ),
-                if (!showSeparator) const SizedBox(height: 12.0),
+                IconButton(
+                    icon: Icon(Icons.call),
+                    onPressed: () => _makeCall(contact['phone']!, context)),
+                IconButton(
+                    icon: Icon(Icons.edit),
+                    onPressed: () => _showEditDialog(context, contact)),
+                IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () => _deleteContact(contact['id'])),
               ],
             ),
           );
         },
         onReorder: (oldIndex, newIndex) {
-          emergencyService.reorderEmergencyContact(oldIndex, newIndex);
-          setState(() {});
+          setState(() {
+            emergencyService.reorderEmergencyContact(oldIndex, newIndex);
+          });
         },
       ),
       floatingActionButton: FloatingActionButton.extended(

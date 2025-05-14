@@ -105,9 +105,9 @@ class EmergencyService {
     return maxId + 1;
   }
 
-  List<Map<String, dynamic>> getEmergencyContacts() {
-    return List.from(_emergencyContacts); // Retorna una copia de la lista
-  }
+  List<Map<String, dynamic>> getEmergencyContacts({bool copy = true}) {
+  return copy ? List.from(_emergencyContacts) : _emergencyContacts;
+}
 
   void deleteEmergencyContactById(int id) {
   final index = _emergencyContacts.indexWhere((contact) => contact['id'] == id);
@@ -148,11 +148,14 @@ class EmergencyService {
   }
 
   void reorderEmergencyContact(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || oldIndex >= _emergencyContacts.length || 
-        newIndex < 0 || newIndex >= _emergencyContacts.length) {
-      return;
-    }
-    final contact = _emergencyContacts.removeAt(oldIndex);
-    _emergencyContacts.insert(newIndex, contact);
-  }
+  if (oldIndex < 0 || newIndex < 0) return;
+  
+  // Ajuste para evitar errores cuando newIndex > longitud de la lista
+  final adjustedNewIndex = newIndex > _emergencyContacts.length
+      ? _emergencyContacts.length
+      : newIndex;
+
+  final contact = _emergencyContacts.removeAt(oldIndex);
+  _emergencyContacts.insert(adjustedNewIndex, contact);
+}
 }
