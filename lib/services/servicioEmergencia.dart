@@ -109,11 +109,13 @@ class EmergencyService {
     return List.from(_emergencyContacts); // Retorna una copia de la lista
   }
 
-  void deleteEmergencyContact(int index) {
+  void deleteEmergencyContactById(int id) {
+  final index = _emergencyContacts.indexWhere((contact) => contact['id'] == id);
+  if (index != -1) {
     _emergencyContacts.removeAt(index);
-    // Actualiza nextId después de eliminar un contacto
-    nextId = _calculateNextId();
   }
+  nextId = _calculateNextId();
+}
 
   void updateEmergencyContact({
     required int id,
@@ -143,5 +145,14 @@ class EmergencyService {
       'isPersonal': isPersonal,
     });
     nextId++;
+  }
+
+  void reorderEmergencyContact(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= _emergencyContacts.length || 
+        newIndex < 0 || newIndex >= _emergencyContacts.length) {
+      return;
+    }
+    final contact = _emergencyContacts.removeAt(oldIndex);
+    _emergencyContacts.insert(newIndex, contact);
   }
 }

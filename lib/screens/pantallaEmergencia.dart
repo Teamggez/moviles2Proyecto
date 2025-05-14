@@ -163,8 +163,8 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
     );
   }
 
-  void _deleteContact(int index) {
-    emergencyService.deleteEmergencyContact(index);
+  void _deleteContact(int id) {
+    emergencyService.deleteEmergencyContactById(id);
     setState(() {});
   }
 
@@ -187,97 +187,101 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
         elevation: 2,
       ),
       backgroundColor: Colors.grey[100],
-      body: ListView.separated(
+      body: ReorderableListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
         itemCount: contacts.length,
         itemBuilder: (context, index) {
           final contact = contacts[index];
-          final IconData iconData =
-              contact['icon'] as IconData? ?? Icons.contact_phone;
+          final bool isLastItem = index == contacts.length - 1;
+          final bool currentIsPersonal = contact['isPersonal'] == true;
+          bool nextIsPersonal = false;
+          if (!isLastItem) {
+            nextIsPersonal = contacts[index + 1]['isPersonal'] == true;
+          }
+          final showSeparator = !currentIsPersonal && nextIsPersonal;
 
           return Card(
+            key: ValueKey(contact['id']),
             elevation: 2.0,
             margin: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12.0),
             ),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: theme.primaryColor.withOpacity(0.1),
-                child: Icon(
-                  iconData,
-                  color: theme.primaryColor,
-                  size: 24,
-                ),
-              ),
-              title: Text(
-                contact['name']!,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  color: Color(0xFF334155),
-                ),
-              ),
-              subtitle: Text(
-                contact['phone']!,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.call_outlined,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: theme.primaryColor.withOpacity(0.1),
+                    child: Icon(
+                      contact['icon'] as IconData? ?? Icons.contact_phone,
                       color: theme.primaryColor,
-                      size: 28,
+                      size: 24,
                     ),
-                    tooltip: 'Llamar a ${contact['name']}',
-                    onPressed: () => _makeCall(contact['phone']!, context),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.edit),
-                    onPressed: () => _showEditContactDialog(context, contact),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete,
-                      color: Colors.red,
-                      size: 28,
+                  title: Text(
+                    contact['name']!,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: Color(0xFF334155),
                     ),
-                    tooltip: 'Eliminar contacto',
-                    onPressed: () {
-                      _deleteContact(index);
-                    },
                   ),
-                ],
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+                  subtitle: Text(
+                    contact['phone']!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.call_outlined,
+                          color: theme.primaryColor,
+                          size: 28,
+                        ),
+                        tooltip: 'Llamar a ${contact['name']}',
+                        onPressed: () => _makeCall(contact['phone']!, context),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.edit, color: Colors.blueGrey),
+                        onPressed: () =>
+                            _showEditContactDialog(context, contact),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.red,
+                          size: 28,
+                        ),
+                        tooltip: 'Eliminar contacto',
+                        onPressed: () => _deleteContact(contact['id']),
+                      ),
+                    ],
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                      vertical: 10.0, horizontal: 16.0),
+                ),
+                if (showSeparator)
+                  const Padding(
+                    padding:
+                        EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+                    child: Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Colors.black26,
+                    ),
+                  ),
+                if (!showSeparator) const SizedBox(height: 12.0),
+              ],
             ),
           );
         },
-        separatorBuilder: (context, index) {
-          bool nextIsPersonal = false;
-          if (index + 1 < contacts.length) {
-            nextIsPersonal = contacts[index + 1]['isPersonal'] == true;
-          }
-          bool currentIsPersonal = contacts[index]['isPersonal'] == true;
-
-          if (!currentIsPersonal && nextIsPersonal) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
-              child: Divider(
-                height: 1,
-                thickness: 1,
-                color: Colors.black26,
-              ),
-            );
-          } else {
-            return const SizedBox(height: 12.0);
-          }
+        onReorder: (oldIndex, newIndex) {
+          emergencyService.reorderEmergencyContact(oldIndex, newIndex);
+          setState(() {});
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
