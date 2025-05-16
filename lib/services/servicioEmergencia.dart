@@ -101,21 +101,23 @@ class EmergencyService {
   // Calcula el siguiente ID disponible
   int _calculateNextId() {
     if (_emergencyContacts.isEmpty) return 1;
-    final maxId = _emergencyContacts.map((contact) => contact['id'] as int).reduce(max);
+    final maxId =
+        _emergencyContacts.map((contact) => contact['id'] as int).reduce(max);
     return maxId + 1;
   }
 
   List<Map<String, dynamic>> getEmergencyContacts({bool copy = true}) {
-  return copy ? List.from(_emergencyContacts) : _emergencyContacts;
-}
+    return copy ? List.from(_emergencyContacts) : _emergencyContacts;
+  }
 
   void deleteEmergencyContactById(int id) {
-  final index = _emergencyContacts.indexWhere((contact) => contact['id'] == id);
-  if (index != -1) {
-    _emergencyContacts.removeAt(index);
+    final index =
+        _emergencyContacts.indexWhere((contact) => contact['id'] == id);
+    if (index != -1) {
+      _emergencyContacts.removeAt(index);
+    }
+    nextId = _calculateNextId();
   }
-  nextId = _calculateNextId();
-}
 
   void updateEmergencyContact({
     required int id,
@@ -148,14 +150,15 @@ class EmergencyService {
   }
 
   void reorderEmergencyContact(int oldIndex, int newIndex) {
-  if (oldIndex < 0 || newIndex < 0) return;
-  
-  // Ajuste para evitar errores cuando newIndex > longitud de la lista
-  final adjustedNewIndex = newIndex > _emergencyContacts.length
-      ? _emergencyContacts.length
-      : newIndex;
+    if (oldIndex < newIndex) newIndex -= 1;
+    final contact = _emergencyContacts.removeAt(oldIndex);
+    _emergencyContacts.insert(newIndex, contact);
+    // Aquí debes actualizar el backend con el nuevo orden
+    _updateBackendOrder();
+  }
 
-  final contact = _emergencyContacts.removeAt(oldIndex);
-  _emergencyContacts.insert(adjustedNewIndex, contact);
-}
+  void _updateBackendOrder() async {
+    final List orderedIds = _emergencyContacts.map((c) => c['id']).toList();
+    // Llama a tu API para guardar el nuevo orden usando orderedIds
+  }
 }

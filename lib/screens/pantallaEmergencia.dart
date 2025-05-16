@@ -200,13 +200,13 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                    icon: Icon(Icons.call),
+                    icon: const Icon(Icons.call),
                     onPressed: () => _makeCall(contact['phone']!, context)),
                 IconButton(
-                    icon: Icon(Icons.edit),
+                    icon: const Icon(Icons.edit),
                     onPressed: () => _showEditDialog(context, contact)),
                 IconButton(
-                    icon: Icon(Icons.delete),
+                    icon: const Icon(Icons.delete),
                     onPressed: () => _deleteContact(contact['id'])),
               ],
             ),
