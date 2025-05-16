@@ -81,7 +81,7 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
                     id: contact['id'],
                     name: name,
                     phone: phone,
-                    icon: contact['icon'],
+                    iconName: contact['iconName'],
                     isPersonal: contact['isPersonal'],
                   );
                   if (context.mounted) {
@@ -139,7 +139,7 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
                   emergencyService.addEmergencyContact(
                     name: name,
                     phone: phone,
-                    icon: Icons.person_add_alt_1,
+                    iconName: 'person',
                     isPersonal: true,
                   );
 
@@ -194,23 +194,28 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
           final contact = contacts[index];
           return ListTile(
             key: ValueKey(contact['id']),
+            leading: Icon(emergencyService.getIconFromName(contact['iconName'])),
             title: Text(contact['name']),
             subtitle: Text(contact['phone']),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                    icon: const Icon(Icons.call),
-                    onPressed: () => _makeCall(contact['phone']!, context)),
+                  icon: const Icon(Icons.call),
+                  onPressed: () => _makeCall(contact['phone'], context),
+                ),
                 IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () => _showEditDialog(context, contact)),
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => _showEditDialog(context, contact),
+                ),
                 IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () => _deleteContact(contact['id'])),
+                  icon: const Icon(Icons.delete),
+                  onPressed: () => _deleteContact(contact['id']),
+                ),
               ],
             ),
           );
+
         },
         onReorder: (oldIndex, newIndex) {
           setState(() {

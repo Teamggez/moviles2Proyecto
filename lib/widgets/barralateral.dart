@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/reporteformulario.dart';
-import '../screens/fake_report_map_screen.dart'; // Asegúrate que la ruta sea correcta
+// import '../screens/fake_report_map_screen.dart';
 
 class BarraLateral extends StatelessWidget {
   final VoidCallback onLogout;
@@ -44,23 +44,25 @@ class BarraLateral extends StatelessWidget {
             },
           ),
 
-          // NUEVO ELEMENTO PARA LA PANTALLA DE REPORTES FALSOS
-          ListTile(
-            leading: Icon(Icons.map_outlined, color: Colors.orange.shade700),
-            title: const Text('Generar Reportes (Mapa)',
-              style: TextStyle(fontWeight: FontWeight.w500),
-            ),
-            onTap: () {
-              Navigator.pop(context); // Cierra el drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const FakeReportMapScreen(), // Navega a la nueva pantalla
-                ),
-              );
-            },
-          ),
-          // FIN DEL NUEVO ELEMENTO
+        // NUEVO ELEMENTO PARA LA PANTALLA DE REPORTES FALSOS
+        // ListTile(
+        //   leading: Icon(Icons.map_outlined, color: Colors.orange.shade700),
+        //   title: const Text(
+        //     'Generar Reportes (Mapa)',
+        //     style: TextStyle(fontWeight: FontWeight.w500),
+        //   ),
+        //   onTap: () {
+        //     Navigator.pop(context); // Cierra el drawer
+        //     Navigator.push(
+        //       context,
+        //       MaterialPageRoute(
+        //         builder: (context) => const FakeReportMapScreen(), // Navega a la nueva pantalla
+        //       ),
+        //     );
+        //   },
+        // ),
+        // FIN DEL NUEVO ELEMENTO
+
 
           const Divider(),
           

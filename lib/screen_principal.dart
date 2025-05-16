@@ -4,12 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../services/custom_heatmap.dart';
-
 import '../widgets/barralateral.dart';
-import '../widgets/LeyendaMapa.dart';
+import '../widgets/LeyendaMapa.dart'; // Asegúrate que esta ruta sea correcta
 import '../widgets/alternar_boton.dart';
 import '../widgets/botonEmergencia.dart';
-import 'screen_secundario.dart';
+// import 'screen_secundario.dart'; // Comentado si _navigateToSecondaryScreen no se usa
 import 'screenRutaSegura.dart';
 
 class ScreenPrincipal extends StatefulWidget {
@@ -49,6 +48,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
     setState(() {
       _isLoadingReportData = true;
       _allReportPoints = [];
+      _tileOverlays = {}; // Limpiar overlays al recargar
     });
 
     try {
@@ -76,12 +76,9 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
       if (mounted) {
         setState(() {
           _allReportPoints = tempData;
-          _updateTileOverlay();
           _isLoadingReportData = false;
         });
-        
-        // Depuración: Imprimir cantidad de puntos cargados
-        print('Puntos cargados: ${_allReportPoints.length}');
+        _updateTileOverlay(); // Llamar después de actualizar _allReportPoints
       }
     } catch (e) {
       if (mounted) {
@@ -93,7 +90,6 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             SnackBar(content: Text('Error al cargar datos de reportes: $e')),
           );
         }
-        print('Error al cargar reportes: $e');
       }
     }
   }
@@ -101,43 +97,41 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
   void _updateTileOverlay() {
     if (!mounted) return;
     
-    // Verificar si hay puntos para mostrar
-    if (_allReportPoints.isEmpty) {
-      setState(() {
-        _tileOverlays = {};
-      });
+    if (_allReportPoints.isEmpty && !_isLoadingReportData) {
+      if (mounted) {
+        setState(() {
+          _tileOverlays = {};
+        });
+      }
       return;
     }
-    
-    // Crear el proveedor de tiles para el mapa de calor
-    final heatmapTileProvider = CustomHeatmapTileProvider(
-      allReportPoints: _allReportPoints,
-      radiusPixels: 40,
-      // Personalizar colores del gradiente si es necesario
-      gradientColors: const [
-        Color.fromARGB(0, 0, 0, 255),      // Transparente -> Azul
-        Color.fromARGB(100, 0, 255, 255),  // Cian
-        Color.fromARGB(120, 0, 255, 0),    // Verde
-        Color.fromARGB(150, 255, 255, 0),  // Amarillo
-        Color.fromARGB(180, 255, 0, 0),    // Rojo
-      ],
-      gradientStops: const [0.0, 0.25, 0.5, 0.75, 1.0],
-    );
+    if (_allReportPoints.isNotEmpty) {
+      final heatmapTileProvider = CustomHeatmapTileProvider(
+        allReportPoints: _allReportPoints,
+        radiusPixels: 40,
+        gradientColors: const [
+          Color.fromARGB(0, 0, 0, 255),
+          Color.fromARGB(100, 0, 255, 255),
+          Color.fromARGB(120, 0, 255, 0),
+          Color.fromARGB(150, 255, 255, 0),
+          Color.fromARGB(180, 255, 0, 0),
+        ],
+        gradientStops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+      );
 
-    // Crear el overlay de tiles
-    final TileOverlay heatmapOverlay = TileOverlay(
-      tileOverlayId: const TileOverlayId('heatmap_overlay'),
-      tileProvider: heatmapTileProvider,
-      fadeIn: true,
-      transparency: 0.0,  // 0.0 = completamente opaco, 1.0 = completamente transparente
-    );
-
-    setState(() {
-      _tileOverlays = {heatmapOverlay};
-    });
-    
-    // Forzar actualización del mapa
-    _mapController?.animateCamera(CameraUpdate.zoomBy(0.01));
+      final TileOverlay heatmapOverlay = TileOverlay(
+        tileOverlayId: const TileOverlayId('heatmap_overlay'),
+        tileProvider: heatmapTileProvider,
+        fadeIn: true,
+        transparency: 0.0,
+      );
+      if(mounted){
+        setState(() {
+          _tileOverlays = {heatmapOverlay};
+        });
+      }
+    }
+    _mapController?.animateCamera(CameraUpdate.zoomBy(0.000001)); // Pequeño cambio para forzar redibujo
   }
 
   void _toggleLeyenda() {
@@ -155,15 +149,18 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
   }
 
   void _handleLogout() {
+    if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
   }
 
-  void _navigateToSecondaryScreen() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const ScreenSecundario()),
-    );
-  }
+  // Si _navigateToSecondaryScreen no se usa, se puede eliminar.
+  // void _navigateToSecondaryScreen() {
+  //   if (!mounted) return;
+  //   Navigator.pushReplacement(
+  //     context,
+  //     MaterialPageRoute(builder: (context) => const ScreenSecundario()),
+  //   );
+  // }
 
   void _zoomIn() {
     _mapController?.animateCamera(CameraUpdate.zoomIn());
@@ -173,7 +170,6 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
     _mapController?.animateCamera(CameraUpdate.zoomOut());
   }
 
-  // Método para refrescar los datos
   void _refreshData() {
     _fetchAllReportPoints();
   }
@@ -189,6 +185,10 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             mapType: MapType.normal,
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
+              // Forzar una actualización inicial del tile overlay si los datos ya están cargados
+              if (!_isLoadingReportData) {
+                _updateTileOverlay();
+              }
             },
             zoomControlsEnabled: false,
             myLocationButtonEnabled: false,
@@ -249,7 +249,6 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
               ),
             ),
           ),
-          // Botón para refrescar datos
           Positioned(
             top: 100,
             left: 20,
@@ -276,50 +275,21 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             ),
           ),
           Positioned(
-          top: 100,
-          right: 20,
-          child: SafeArea(
-            child: AlternarBoton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const ScreenRutaSegura()),
-                );
-              },
-              tooltip: 'Ver pantalla secundaria',
+            top: 100,
+            right: 20,
+            child: SafeArea(
+              child: AlternarBoton(
+                onPressed: () {
+                  if (mounted) { // Verificar `mounted` antes de la navegación
+                    Navigator.of(context).pushReplacement( // Usar pushReplacement si no se quiere volver
+                      MaterialPageRoute(builder: (context) => const ScreenRutaSegura()),
+                    );
+                  }
+                },
+                tooltip: 'Ver pantalla de Ruta Segura',
+              ),
             ),
           ),
-        ),
-          // Positioned(
-          //   top: 100,
-          //   right: 20,
-          //   child: SafeArea(
-          //     child: AlternarBoton(
-          //       onPressed: _navigateToSecondaryScreen,
-          //       tooltip: 'Ver pantalla secundaria',
-          //     ),
-          //   ),
-          // ),
-            //           Positioned(
-            //   bottom: 100,
-            //   left: 20,
-            //   child: ElevatedButton.icon(
-            //     icon: const Icon(Icons.directions),
-            //     label: const Text("Ruta Segura"),
-            //     style: ElevatedButton.styleFrom(
-            //       backgroundColor: Colors.blueAccent,
-            //       foregroundColor: Colors.white,
-            //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            //       shape: RoundedRectangleBorder(
-            //         borderRadius: BorderRadius.circular(12),
-            //       ),
-            //     ),
-            //     onPressed: () {
-            //       Navigator.of(context).push(
-            //         MaterialPageRoute(builder: (context) => const ScreenRutaSegura()),
-            //       );
-            //     },
-            //   ),
-            // ),
           Positioned( 
             bottom: 20,
             right: 20,
@@ -359,7 +329,6 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             left: 20, 
             child: SafeArea(child: EmergencyButton()),
           ),
-          // Indicador de cantidad de puntos
           Positioned(
             bottom: 80,
             left: 20,
@@ -392,29 +361,11 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
               child: GestureDetector(
                 onTap: _closeLeyenda,
                 child: Container(
-                  color: Colors.black.withAlpha((0.5 * 255).round()),
-                  child: SafeArea(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 20, horizontal: 16),
-                        child: GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            width: MediaQuery.of(context).size.width * 0.85,
-                            constraints: BoxConstraints(
-                                maxHeight:
-                                    MediaQuery.of(context).size.height * 0.9),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: SingleChildScrollView(
-                                physics: const BouncingScrollPhysics(),
-                                child: LeyendaMapa(onClose: _closeLeyenda),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                  color: Colors.black.withAlpha((0.6 * 255).round()),
+                  child: Center(
+                    child: LeyendaMapa(
+                      onClose: _closeLeyenda,
+                      tipo: LeyendaTipo.principal, 
                     ),
                   ),
                 ),
