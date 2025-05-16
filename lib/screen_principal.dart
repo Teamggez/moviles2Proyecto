@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'widgets/botonEmergencia.dart';
 import 'widgets/barralateral.dart';
 import 'widgets/LeyendaMapa.dart';
+import 'screenRutaSegura.dart';
 
 class ScreenPrincipal extends StatefulWidget {
   const ScreenPrincipal({super.key});

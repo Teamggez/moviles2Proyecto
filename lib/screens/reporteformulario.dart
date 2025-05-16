@@ -43,9 +43,9 @@ class _ReporteFormularioScreenState extends State<ReporteFormularioScreen> {
   ];
 
   final Map<String, Map<String, dynamic>> _riskLevelsData = {
-    'Poco riesgo':    {'color': Colors.green,  'icon': Icons.warning},
-    'Riesgo moderado':{'color': Colors.orange, 'icon': Icons.warning},
-    'Alto riesgo':    {'color': Colors.red,    'icon': Icons.warning},
+    'Bajo':    {'color': Colors.green,  'icon': Icons.warning},
+    'Medio':{'color': Colors.orange, 'icon': Icons.warning},
+    'Alto':    {'color': Colors.red,    'icon': Icons.warning},
   };
 
   @override

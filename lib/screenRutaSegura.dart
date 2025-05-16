@@ -84,7 +84,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
           .collection('Reportes')
           .where('estado', isEqualTo: 'Activo')
           .where('nivelRiesgo',
-              isEqualTo: 'Alto riesgo') // Filtrar por alto riesgo
+              isEqualTo: 'Bajo') // Filtrar por alto riesgo
           .get();
 
       if (mounted) {
