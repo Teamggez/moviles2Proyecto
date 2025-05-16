@@ -1,9 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'widgets/botonEmergencia.dart';
-import 'widgets/barralateral.dart';
-import 'widgets/LeyendaMapa.dart';
-import 'screenRutaSegura.dart';
+
+import '../services/custom_heatmap.dart';
+
+import '../widgets/barralateral.dart';
+import '../widgets/LeyendaMapa.dart';
+import '../widgets/alternar_boton.dart';
+import '../widgets/botonEmergencia.dart';
+import 'screen_secundario.dart';
 
 class ScreenPrincipal extends StatefulWidget {
   const ScreenPrincipal({super.key});
@@ -12,129 +18,138 @@ class ScreenPrincipal extends StatefulWidget {
   State<ScreenPrincipal> createState() => _ScreenPrincipalState();
 }
 
-class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProviderStateMixin {
-  String? dangerType;
-  String? riskLevel;
-  String? lastUpdated;
-  String? safetyRecommendations;
-  bool isPopupVisible = false;
-  bool isLeyendaVisible = false;
-
-  LatLng? tapPosition;
-  Set<Circle> circles = {};
-
+class _ScreenPrincipalState extends State<ScreenPrincipal> {
   GoogleMapController? _mapController;
-  late AnimationController _animationController;
-  late Animation<double> _buttonAnimation;
-  late Animation<Offset> _slideAnimation;
+  bool _isLeyendaVisible = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _buttonAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack)
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    _mapController?.dispose();
-    super.dispose();
-  }
+  Set<TileOverlay> _tileOverlays = {};
+  bool _isLoadingReportData = true;
+  List<ReportPoint> _allReportPoints = [];
 
   static const CameraPosition _kInitialPosition = CameraPosition(
     target: LatLng(-18.0146, -70.2534),
     zoom: 13.0,
   );
 
-  void _onMapTap(LatLng position) {
-    if (isLeyendaVisible) {
+  @override
+  void initState() {
+    super.initState();
+    _fetchAllReportPoints();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchAllReportPoints() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingReportData = true;
+      _allReportPoints = [];
+    });
+
+    try {
+      QuerySnapshot reportSnapshot =
+          await FirebaseFirestore.instance.collection('Reportes').get();
+
+      List<ReportPoint> tempData = [];
+      for (var doc in reportSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data != null && data.containsKey('ubicacion')) {
+          final ubicacion = data['ubicacion'] as Map<String, dynamic>?;
+          if (ubicacion != null &&
+              ubicacion.containsKey('latitud') &&
+              ubicacion.containsKey('longitud')) {
+            final double? lat = (ubicacion['latitud'] as num?)?.toDouble();
+            final double? lng = (ubicacion['longitud'] as num?)?.toDouble();
+
+            if (lat != null && lng != null) {
+              tempData.add(ReportPoint(LatLng(lat, lng)));
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _allReportPoints = tempData;
+          _updateTileOverlay();
+          _isLoadingReportData = false;
+        });
+        
+        // Depuración: Imprimir cantidad de puntos cargados
+        print('Puntos cargados: ${_allReportPoints.length}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingReportData = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al cargar datos de reportes: $e')),
+          );
+        }
+        print('Error al cargar reportes: $e');
+      }
+    }
+  }
+
+  void _updateTileOverlay() {
+    if (!mounted) return;
+    
+    // Verificar si hay puntos para mostrar
+    if (_allReportPoints.isEmpty) {
       setState(() {
-        isLeyendaVisible = false;
+        _tileOverlays = {};
       });
       return;
     }
-
-    setState(() {
-      tapPosition = position;
-      dangerType = 'Robo';
-      lastUpdated = '2025-05-02 ${DateTime.now().hour}:${DateTime.now().minute}';
-      safetyRecommendations = 'Cuidado con tus pertenencias en esta zona.';
-
-      double lat = position.latitude;
-      double lng = position.longitude;
-
-      if (lat > -18.01 && lat < -17.99) {
-        riskLevel = 'Peligroso';
-      } else if (lng > -70.26 && lng < -70.24) {
-        riskLevel = 'Medio';
-      } else {
-        riskLevel = 'Seguro';
-      }
-
-      _addCircle(position);
-      isPopupVisible = true;
-      _animationController.forward(from: 0.0);
-    });
-  }
-
-  void _addCircle(LatLng position) {
-    Color circleColor = Colors.green.withAlpha(153); // Replaced withOpacity(0.6)
-    double circleRadius = 60.0;
-
-    if (riskLevel == 'Peligroso') {
-      circleColor = Colors.red.withAlpha(153); // Replaced withOpacity(0.6)
-      circleRadius = 80.0;
-    } else if (riskLevel == 'Medio') {
-      circleColor = Colors.orange.withAlpha(153); // Replaced withOpacity(0.6)
-      circleRadius = 70.0;
-    }
-
-    Circle circle = Circle(
-      circleId: CircleId(position.toString()),
-      center: position,
-      radius: circleRadius,
-      fillColor: circleColor,
-      strokeColor: circleColor.withAlpha(204), // Replaced withOpacity(0.8)
-      strokeWidth: 2,
+    
+    // Crear el proveedor de tiles para el mapa de calor
+    final heatmapTileProvider = CustomHeatmapTileProvider(
+      allReportPoints: _allReportPoints,
+      radiusPixels: 40,
+      // Personalizar colores del gradiente si es necesario
+      gradientColors: const [
+        Color.fromARGB(0, 0, 0, 255),      // Transparente -> Azul
+        Color.fromARGB(100, 0, 255, 255),  // Cian
+        Color.fromARGB(120, 0, 255, 0),    // Verde
+        Color.fromARGB(150, 255, 255, 0),  // Amarillo
+        Color.fromARGB(180, 255, 0, 0),    // Rojo
+      ],
+      gradientStops: const [0.0, 0.25, 0.5, 0.75, 1.0],
     );
 
-    circles.clear();
-    circles.add(circle);
-  }
+    // Crear el overlay de tiles
+    final TileOverlay heatmapOverlay = TileOverlay(
+      tileOverlayId: const TileOverlayId('heatmap_overlay'),
+      tileProvider: heatmapTileProvider,
+      fadeIn: true,
+      transparency: 0.0,  // 0.0 = completamente opaco, 1.0 = completamente transparente
+    );
 
-  void _closePopup() {
-    _animationController.reverse().then((_) {
-      if (mounted) { // Check if widget is still mounted
-        setState(() {
-          isPopupVisible = false;
-        });
-      }
+    setState(() {
+      _tileOverlays = {heatmapOverlay};
     });
+    
+    // Forzar actualización del mapa
+    _mapController?.animateCamera(CameraUpdate.zoomBy(0.01));
   }
 
   void _toggleLeyenda() {
+    if (!mounted) return;
     setState(() {
-      isLeyendaVisible = !isLeyendaVisible;
+      _isLeyendaVisible = !_isLeyendaVisible;
     });
   }
 
   void _closeLeyenda() {
+    if (!mounted) return;
     setState(() {
-      isLeyendaVisible = false;
+      _isLeyendaVisible = false;
     });
   }
 
@@ -142,35 +157,46 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
     Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
   }
 
+  void _navigateToSecondaryScreen() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const ScreenSecundario()),
+    );
+  }
+
+  void _zoomIn() {
+    _mapController?.animateCamera(CameraUpdate.zoomIn());
+  }
+
+  void _zoomOut() {
+    _mapController?.animateCamera(CameraUpdate.zoomOut());
+  }
+
+  // Método para refrescar los datos
+  void _refreshData() {
+    _fetchAllReportPoints();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // final mediaQuery = MediaQuery.of(context); // Removed unused mediaQuery
-    // final screenHeight = mediaQuery.size.height; // Removed unused screenHeight
-
-    Color riskColor = Colors.green;
-    if (riskLevel == 'Peligroso') {
-      riskColor = Colors.red;
-    } else if (riskLevel == 'Medio') {
-      riskColor = Colors.orange;
-    }
-
     return Scaffold(
       drawer: BarraLateral(onLogout: _handleLogout),
       body: Stack(
         children: [
           GoogleMap(
-            mapType: MapType.normal,
             initialCameraPosition: _kInitialPosition,
-            zoomControlsEnabled: false,
-            zoomGesturesEnabled: true,
-            myLocationButtonEnabled: false,
-            myLocationEnabled: true,
-            circles: circles,
-            onTap: _onMapTap,
+            mapType: MapType.normal,
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
             },
+            zoomControlsEnabled: false,
+            myLocationButtonEnabled: false,
+            myLocationEnabled: true,
+            tileOverlays: _tileOverlays,
           ),
+          if (_isLoadingReportData)
+            const Center(child: CircularProgressIndicator()),
+          
           Positioned(
             top: 40,
             left: 20,
@@ -178,11 +204,11 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
               child: Builder(
                 builder: (context) => Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(217), // Replaced withOpacity(0.85)
+                    color: Colors.white.withAlpha((0.85 * 255).round()),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withAlpha(51), // Replaced withOpacity(0.2)
+                        color: Colors.black.withAlpha((0.2 * 255).round()),
                         blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
@@ -204,14 +230,13 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
             child: SafeArea(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(217), // Replaced withOpacity(0.85)
+                  color: Colors.white.withAlpha((0.85 * 255).round()),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha(51), // Replaced withOpacity(0.2)
-                      blurRadius: 5,
-                      offset: const Offset(0, 2),
-                    ),
+                        color: Colors.black.withAlpha((0.2 * 255).round()),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2)),
                   ],
                 ),
                 child: IconButton(
@@ -223,206 +248,127 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
               ),
             ),
           ),
-          AnimatedBuilder(
-            animation: _buttonAnimation,
-            builder: (context, child) {
-              final double zoomBottomPosition = isPopupVisible
-                  ? 240 + (_buttonAnimation.value * 60)
-                  : 120 + ((1 - _buttonAnimation.value) * 40);
-
-              return Positioned(
-                bottom: zoomBottomPosition,
-                right: 20,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(51), // Replaced withOpacity(0.2)
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min, // Ensure column takes minimum space
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: () {
-                          _mapController?.animateCamera(
-                            CameraUpdate.zoomIn(),
-                          );
-                        },
-                        tooltip: 'Zoom in',
-                      ),
-                      const Divider(height: 1, indent: 4, endIndent: 4), // Added indent
-                      IconButton(
-                        icon: const Icon(Icons.remove),
-                        onPressed: () {
-                          _mapController?.animateCamera(
-                            CameraUpdate.zoomOut(),
-                          );
-                        },
-                        tooltip: 'Zoom out',
-                      ),
-                    ],
-                  ),
+          // Botón para refrescar datos
+          Positioned(
+            top: 100,
+            left: 20,
+            child: SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha((0.85 * 255).round()),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha((0.2 * 255).round()),
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-              );
-            },
+                child: IconButton(
+                  icon: const Icon(Icons.refresh),
+                  color: Colors.black54,
+                  tooltip: 'Refrescar datos',
+                  onPressed: _refreshData,
+                ),
+              ),
+            ),
           ),
-          if (isPopupVisible && riskLevel != null)
-            Positioned(
-              bottom: 20,
-              left: 10,
-              right: 10,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: Card(
-                  elevation: 8,
+          Positioned(
+            top: 100,
+            right: 20,
+            child: SafeArea(
+              child: AlternarBoton(
+                onPressed: _navigateToSecondaryScreen,
+                tooltip: 'Ver pantalla secundaria',
+              ),
+            ),
+          ),
+          Positioned( 
+            bottom: 20,
+            right: 20,
+            child: SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
                   color: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tipo de Peligro: ${dangerType ?? '-'}',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: riskColor,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Nivel de Riesgo: ${riskLevel!}',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: riskColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Última Actualización: ${lastUpdated ?? '-'}',
-                              style: const TextStyle(fontSize: 16, color: Colors.black54)
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Recomendaciones:',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              safetyRecommendations ?? '-', // Removed unnecessary interpolation
-                              style: const TextStyle(fontSize: 16, color: Colors.black54)
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: const BorderRadius.only(
-                              topRight: Radius.circular(16),
-                              bottomLeft: Radius.circular(16),
-                            ),
-                            onTap: _closePopup,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: const BoxDecoration(
-                                color: Colors.black12,
-                                borderRadius: BorderRadius.only(
-                                  topRight: Radius.circular(16),
-                                  bottomLeft: Radius.circular(16),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 18,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withAlpha((0.2 * 255).round()),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: _zoomIn,
+                      tooltip: 'Zoom in',
+                    ),
+                    const Divider(height: 1, indent: 4, endIndent: 4),
+                    IconButton(
+                      icon: const Icon(Icons.remove),
+                      onPressed: _zoomOut,
+                      tooltip: 'Zoom out',
+                    ),
+                  ],
                 ),
               ),
             ),
-            Positioned(
-              bottom: 100,
-              left: 20,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.directions),
-                label: const Text("Ruta Segura"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const ScreenRutaSegura()),
-                  );
-                },
-              ),
-            ),
-            
-          AnimatedBuilder(
-            animation: _buttonAnimation,
-            builder: (context, child) {
-              final double bottomPosition = isPopupVisible
-                  ? 190 + (_buttonAnimation.value * 40)
-                  : 20 + ((1 - _buttonAnimation.value) * 40);
-
-              return Positioned(
-                bottom: bottomPosition,
-                right: 20,
-                child: child!, // Pass the child (EmergencyButton)
-              );
-            },
-            child: const EmergencyButton(), // Added const and moved here
           ),
-          if (isLeyendaVisible)
+          const Positioned( 
+            bottom: 20,
+            left: 20, 
+            child: SafeArea(child: EmergencyButton()),
+          ),
+          // Indicador de cantidad de puntos
+          Positioned(
+            bottom: 80,
+            left: 20,
+            child: SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha((0.2 * 255).round()),
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'Reportes: ${_allReportPoints.length}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_isLeyendaVisible)
             Positioned.fill(
               child: GestureDetector(
                 onTap: _closeLeyenda,
                 child: Container(
-                  color: Colors.black.withAlpha(128), // Replaced withOpacity(0.5)
+                  color: Colors.black.withAlpha((0.5 * 255).round()),
                   child: SafeArea(
                     child: Center(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 20, horizontal: 16),
                         child: GestureDetector(
                           onTap: () {},
                           child: Container(
                             width: MediaQuery.of(context).size.width * 0.85,
                             constraints: BoxConstraints(
-                              maxHeight: MediaQuery.of(context).size.height * 0.9,
-                            ),
+                                maxHeight:
+                                    MediaQuery.of(context).size.height * 0.9),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(20),
                               child: SingleChildScrollView(
