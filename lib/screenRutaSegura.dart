@@ -91,9 +91,8 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
   bool _isRouteSearchVisible = false;
   bool _isLoadingRoute = false;
 
-  // Constantes para UI (ejemplo)
   static const double _buttonIconSize = 24.0;
-  static const double _reportMarkerIconSize = 34.0; // Tamaño reducido para marcadores de reporte
+  static const double _reportMarkerIconSize = 34.0;
   static const double _originMarkerIconSize = 72.0;
 
 
@@ -323,7 +322,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
       IconData iconData = categoryStyle['iconData'] as IconData? ?? Icons.help_outline;
       Color iconColor = categoryStyle['color'] as Color? ?? Colors.grey;
 
-      final BitmapDescriptor iconBitmap = await _bitmapDescriptorFromIconData(iconData, iconColor, size: _reportMarkerIconSize); // Usar constante
+      final BitmapDescriptor iconBitmap = await _bitmapDescriptorFromIconData(iconData, iconColor, size: _reportMarkerIconSize);
       newReportMarkers.add(Marker(
         markerId: MarkerId('reporte_${reporte['docId']}'),
         position: pos,
@@ -443,7 +442,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
             .join(', ');
         return address.isNotEmpty ? address : "${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}";
       }
-    } catch (_) { /* Consider logging */ }
+    } catch (_) {  }
     return "${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}";
   }
 
@@ -545,7 +544,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
       }
       List<Location> locations = await locationFromAddress(address);
       if (locations.isNotEmpty) return LatLng(locations.first.latitude, locations.first.longitude);
-    } catch (_) { /* Consider logging */ }
+    } catch (_) {  }
     return null;
   }
 
@@ -897,10 +896,80 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
       ),
     );
   }
+  
+  Widget _buildRouteInfoDisplay(String? normalInfo, String? safeInfo) {
+    if (normalInfo == null && safeInfo == null) {
+      return const SizedBox.shrink();
+    }
+
+    List<Widget> routeWidgets = [];
+
+    if (normalInfo != null) {
+      routeWidgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(Icons.route, color: Colors.blue.shade700, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "Ruta Normal: $normalInfo",
+                  style: TextStyle(
+                    color: Colors.blue.shade700,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (safeInfo != null) {
+      bool isDetour = safeInfo.contains('Desvío');
+      
+      routeWidgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(isDetour ? Icons.alt_route : Icons.shield_outlined, color: Colors.green.shade700, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  safeInfo, 
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontSize: 14, 
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: routeWidgets,
+      ),
+    );
+  }
 
   Widget _buildRouteSearchPanelWidget(BuildContext context) {
     return Positioned(
-      top: 10, left: 10, right: 10,
+      top: MediaQuery.of(context).padding.top + 15.0,
+      left: 10, 
+      right: 10,
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -967,17 +1036,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
                   style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.secondary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
                 ),
               ),
-              if (_normalRouteInfo != null || _safeRouteInfo != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_normalRouteInfo != null) Text("Ruta Normal: $_normalRouteInfo", style: TextStyle(color: Colors.blue.shade700, fontSize: 12)),
-                      if (_safeRouteInfo != null) Text(_safeRouteInfo!, style: TextStyle(color: Colors.green.shade700, fontSize: 12)),
-                    ],
-                  ),
-                ),
+              _buildRouteInfoDisplay(_normalRouteInfo, _safeRouteInfo),
             ],
           ),
         ),
