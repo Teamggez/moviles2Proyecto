@@ -368,6 +368,28 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> with SingleTickerProv
                 ),
               ),
             ),
+            Positioned(
+              bottom: 100,
+              left: 20,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.directions),
+                label: const Text("Ruta Segura"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const ScreenRutaSegura()),
+                  );
+                },
+              ),
+            ),
+            
           AnimatedBuilder(
             animation: _buttonAnimation,
             builder: (context, child) {
