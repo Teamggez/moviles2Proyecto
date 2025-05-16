@@ -70,11 +70,11 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
     target: LatLng(-18.0146, -70.2534), zoom: 13.0,
   );
 
-  Set<Polyline> _polylines = {};
+  final Set<Polyline> _polylines = {};
   List<g_places.Prediction> _placeSuggestions = [];
   bool _isFetchingSuggestions = false;
   bool _isOriginFieldFocused = false;
-  Set<Marker> _markers = {};
+  final Set<Marker> _markers = {};
 
   LatLng? _origenLatLng;
   LatLng? _destinoLatLng;
@@ -249,7 +249,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
             Row( children: [ Icon(categoryStyle['iconData'], color: categoryStyle['color'], size: 36), const SizedBox(width: 12), Expanded(child: Text(reporte['titulo'] ?? 'Sin título', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold))), ], ),
             const SizedBox(height: 16),
             if (imageUrl.isNotEmpty) Center( child: ClipRRect( borderRadius: BorderRadius.circular(10), child: Image.network( imageUrl, height: 200, fit: BoxFit.cover,
-                  loadingBuilder: (ctx, child, progress) => progress == null ? child : Container(height: 200, child: Center(child: CircularProgressIndicator(value: progress.expectedTotalBytes != null ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes! : null))),
+                  loadingBuilder: (ctx, child, progress) => progress == null ? child : SizedBox(height: 200, child: Center(child: CircularProgressIndicator(value: progress.expectedTotalBytes != null ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes! : null))),
                   errorBuilder: (ctx, err, st) => Container(height: 150, color: Colors.grey[200], child: Center(child: Icon(Icons.broken_image, size: 50, color: Colors.grey[400]))),
             ))),
             if (imageUrl.isNotEmpty) const SizedBox(height: 16),
@@ -343,8 +343,9 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
      g_places.Location? locationBias = _origenLatLng != null ? g_places.Location(lat: _origenLatLng!.latitude, lng: _origenLatLng!.longitude) : g_places.Location(lat: _kInitialPosition.target.latitude, lng: _kInitialPosition.target.longitude);
     final response = await _places.autocomplete(query, location: locationBias, radius: 50000, language: 'es', components: [g_places.Component("country", "pe")]);
     if (mounted) {
-      if (response.isOkay) setState(() => _placeSuggestions = response.predictions);
-      else { print("[PLACES_API_ERROR] Autocomplete: ${response.errorMessage}"); setState(() => _placeSuggestions = []); }
+      if (response.isOkay) {
+        setState(() => _placeSuggestions = response.predictions);
+      } else { print("[PLACES_API_ERROR] Autocomplete: ${response.errorMessage}"); setState(() => _placeSuggestions = []); }
       setState(() => _isFetchingSuggestions = false);
     }
   }
@@ -438,19 +439,23 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
     if(detourWaypoints.isNotEmpty && routeType == RouteType.safe) routeColor = Colors.green.shade800;
     double routeZIndex = routeType == RouteType.normal ? 1 : 2; 
     
-    String cacheKey = "${origin.latitude},${origin.longitude}_${destination.latitude},${destination.longitude}_$routeTypeStr$detourHash" 
-                      + (fetchAlternativesForSafeRoute && detourWaypoints.isEmpty ? "_google_alt" : "");
+    String cacheKey = "${origin.latitude},${origin.longitude}_${destination.latitude},${destination.longitude}_$routeTypeStr$detourHash${fetchAlternativesForSafeRoute && detourWaypoints.isEmpty ? "_google_alt" : ""}";
 
 
     if (_routeCache.containsKey(cacheKey)) {
       print("[ROUTE_CACHE] Ruta $polylineIdStr desde caché: $cacheKey");
       final cachedData = _routeCache[cacheKey]!;
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _polylines.removeWhere((p) => p.polylineId == PolylineId(cachedData.polylineId));
         _polylines.add(Polyline(polylineId: PolylineId(cachedData.polylineId), points: cachedData.coordinates, color: cachedData.color, width: 6, zIndex: cachedData.zIndex.toInt()));
-        if (routeType == RouteType.normal) _normalRouteInfo = "${cachedData.distanceText ?? ''}, ${cachedData.durationText ?? ''}";
-        else _safeRouteInfo = "${cachedData.distanceText ?? ''}, ${cachedData.durationText ?? ''} ${cachedData.isDetour ? '(Ruta Segura con Desvío)' : '(Ruta Segura - Alternativa Google)'}";
-      }); return;
+        if (routeType == RouteType.normal) {
+          _normalRouteInfo = "${cachedData.distanceText ?? ''}, ${cachedData.durationText ?? ''}";
+        } else {
+          _safeRouteInfo = "${cachedData.distanceText ?? ''}, ${cachedData.durationText ?? ''} ${cachedData.isDetour ? '(Ruta Segura con Desvío)' : '(Ruta Segura - Alternativa Google)'}";
+        }
+      });
+      } return;
     }
 
     print("[ROUTE_API] Solicitando ruta $polylineIdStr...");
@@ -482,7 +487,9 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
            String distanceText = leg['distance']?['text'] ?? 'N/A';
            String durationText = leg['duration']?['text'] ?? 'N/A';
            List<dynamic> steps = leg['steps']; List<LatLng> routeCoordinates = [];
-          for (var step in steps) routeCoordinates.addAll(_decodePolyline(step['polyline']['points']));
+          for (var step in steps) {
+            routeCoordinates.addAll(_decodePolyline(step['polyline']['points']));
+          }
           
           if (routeCoordinates.isEmpty && mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se decodificó ruta $polylineIdStr.'))); return; }
           print("[ROUTE_API] Ruta $polylineIdStr decodificada: ${routeCoordinates.length} puntos. Dist: $distanceText, Dur: $durationText");
@@ -502,8 +509,11 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
               }
               _polylines.add(Polyline(polylineId: PolylineId(polylineIdStr), points: routeCoordinates, color: routeColor, width: 6, zIndex: routeZIndex.toInt()));
               
-              if (routeType == RouteType.normal) _normalRouteInfo = "$distanceText, $durationText";
-              else _safeRouteInfo = "$distanceText, $durationText ${detourWaypoints.isNotEmpty ? '(Ruta Segura con Desvío)' : '(Ruta Segura - Alternativa Google)'}";
+              if (routeType == RouteType.normal) {
+                _normalRouteInfo = "$distanceText, $durationText";
+              } else {
+                _safeRouteInfo = "$distanceText, $durationText ${detourWaypoints.isNotEmpty ? '(Ruta Segura con Desvío)' : '(Ruta Segura - Alternativa Google)'}";
+              }
             });
             
             bool shouldAnimate = (routeType == RouteType.normal && _polylines.where((p)=> p.polylineId.value.startsWith(_safeRouteId)).isEmpty) || 
@@ -531,7 +541,11 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
         if (dist < minDistanceToZone) {
             minDistanceToZone = dist;
             closestPointOnNormalRoute = normalRoutePolyline[i];
-            if (i > 0) entrySegmentIndex = i -1; else entrySegmentIndex = 0;
+            if (i > 0) {
+              entrySegmentIndex = i -1;
+            } else {
+              entrySegmentIndex = 0;
+            }
         }
     }
 
@@ -827,7 +841,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
 
 extension StringExtension on String { 
     String capitalize() {
-      if (this.isEmpty) return "";
-      return "${this[0].toUpperCase()}${this.substring(1).toLowerCase()}";
+      if (isEmpty) return "";
+      return "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
     }
 }

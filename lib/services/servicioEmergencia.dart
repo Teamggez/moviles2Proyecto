@@ -1,12 +1,16 @@
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EmergencyService {
   // Singleton pattern
   static final EmergencyService _instance = EmergencyService._internal();
   factory EmergencyService() => _instance;
-  EmergencyService._internal();
+  EmergencyService._internal() {
+    _loadContacts();
+  }
 
   final List<Map<String, dynamic>> _emergencyContacts = [
     {
@@ -117,6 +121,7 @@ class EmergencyService {
       _emergencyContacts.removeAt(index);
     }
     nextId = _calculateNextId();
+    _saveContacts();
   }
 
   void updateEmergencyContact({
@@ -131,6 +136,7 @@ class EmergencyService {
     contact['phone'] = phone;
     contact['icon'] = icon;
     contact['isPersonal'] = isPersonal;
+    _saveContacts();
   }
 
   void addEmergencyContact({
@@ -147,18 +153,54 @@ class EmergencyService {
       'isPersonal': isPersonal,
     });
     nextId++;
+    _saveContacts();
   }
 
   void reorderEmergencyContact(int oldIndex, int newIndex) {
     if (oldIndex < newIndex) newIndex -= 1;
     final contact = _emergencyContacts.removeAt(oldIndex);
     _emergencyContacts.insert(newIndex, contact);
-    // Aquí debes actualizar el backend con el nuevo orden
+    // Actualiza el backend con el nuevo orden
     _updateBackendOrder();
+    _saveContacts();
   }
 
   void _updateBackendOrder() async {
     final List orderedIds = _emergencyContacts.map((c) => c['id']).toList();
     // Llama a tu API para guardar el nuevo orden usando orderedIds
+  }
+
+  Future<void> _saveContacts() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Convertir cada contacto a un mapa serializable
+    List<Map<String, dynamic>> saveList = _emergencyContacts.map((contact) {
+      return {
+        'id': contact['id'],
+        'name': contact['name'],
+        'phone': contact['phone'],
+        'iconCodePoint': (contact['icon'] as IconData).codePoint,
+        'isPersonal': contact['isPersonal']
+      };
+    }).toList();
+    await prefs.setString('emergency_contacts', jsonEncode(saveList));
+  }
+
+  Future<void> _loadContacts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = prefs.getString('emergency_contacts');
+    if (jsonString != null) {
+      List<dynamic> loadedList = jsonDecode(jsonString);
+      _emergencyContacts.clear();
+      for (var item in loadedList) {
+        _emergencyContacts.add({
+          'id': item['id'],
+          'name': item['name'],
+          'phone': item['phone'],
+          'icon': IconData(item['iconCodePoint'], fontFamily: 'MaterialIcons'),
+          'isPersonal': item['isPersonal'],
+        });
+      }
+      nextId = _calculateNextId();
+    }
   }
 }
