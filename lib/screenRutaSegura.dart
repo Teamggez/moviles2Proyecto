@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data'; // Para Uint8List
-import 'dart:ui' as ui;   // Para PictureRecorder, Canvas, Image
+import 'dart:typed_data'; 
+import 'dart:ui' as ui; 
 import 'dart:math'; 
 
 import 'package:flutter/material.dart';
@@ -13,7 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; 
 import 'package:intl/date_symbol_data_local.dart';
 
-// TODO: REEMPLAZA ESTA CLAVE API CON TU PROPIA CLAVE VÁLIDA DE GOOGLE CLOUD
+// TODO:  DE GOOGLE CLOUD
 const String GOOGLE_MAPS_API_KEY = 'AIzaSyBl1LlKDZ_TslvGooMeecMRl6vrXH3cDRs'; // ¡¡¡CAMBIAR!!!
 
 
