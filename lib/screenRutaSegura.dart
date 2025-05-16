@@ -105,9 +105,10 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
   String? _normalRouteInfo;
   String? _safeRouteInfo;
   
-  static const double CONGESTION_ZONE_RADIUS_DEGREES = 0.002; 
-  static const double DETOUR_OFFSET_DEGREES = 0.003;      
-  static const int MIN_REPORTS_FOR_CONGESTION = 5;      
+  // Constantes para la lógica de desvío (AJUSTAR ESTOS VALORES)
+  static const double REPORT_INFLUENCE_RADIUS_METERS = 200.0; // Radio alrededor de un reporte para considerarlo "cerca" de la ruta
+  static const double DETOUR_CALCULATION_RADIUS_DEGREES = 0.0025; // Radio para el centroide de la zona a evitar (aprox. 250-275m)
+  static const double DETOUR_OFFSET_DEGREES = 0.0035;      // Distancia para desviar (aprox. 350-385m)
 
 
   Map<String, dynamic> _getCategoryStyle(String? typeId) { 
@@ -426,8 +427,8 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
     required LatLng origin, 
     required LatLng destination, 
     required RouteType routeType, 
-    List<LatLng> detourWaypoints = const [], // <--- AÑADIDO
-    bool fetchAlternativesForSafeRoute = false // <--- AÑADIDO
+    List<LatLng> detourWaypoints = const [], 
+    bool fetchAlternativesForSafeRoute = false 
   }) async {
     String routeTypeStr = routeType.toString().split('.').last;
     String detourHash = detourWaypoints.isNotEmpty ? "_detour_${detourWaypoints.map((p) => p.hashCode).join('_')}" : "";
@@ -435,7 +436,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
     
     Color routeColor = routeType == RouteType.normal ? Colors.lightBlueAccent : Colors.green.shade600;
     if(detourWaypoints.isNotEmpty && routeType == RouteType.safe) routeColor = Colors.green.shade800;
-    double routeZIndex = routeType == RouteType.normal ? 1 : 2; // Ruta segura/desvío encima de la normal
+    double routeZIndex = routeType == RouteType.normal ? 1 : 2; 
     
     String cacheKey = "${origin.latitude},${origin.longitude}_${destination.latitude},${destination.longitude}_$routeTypeStr$detourHash" 
                       + (fetchAlternativesForSafeRoute && detourWaypoints.isEmpty ? "_google_alt" : "");
@@ -471,7 +472,6 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
         final data = json.decode(response.body);
         if (data['status'] == 'OK' && data['routes'].isNotEmpty) {
           int routeIdxToUse = 0;
-          // Si es ruta segura, NO hay waypoints de desvío, SÍ se pidieron alternativas Y hay alternativas, tomar la segunda.
           if (routeType == RouteType.safe && detourWaypoints.isEmpty && fetchAlternativesForSafeRoute && data['routes'].length > 1) {
               routeIdxToUse = 1; 
               print("[ROUTE_API] Ruta Segura: Usando alternativa de Google (índice 1).");
@@ -522,10 +522,9 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
     if (normalRoutePolyline.length < 2) return [];
     List<LatLng> detourWaypoints = [];
     
-    // Encontrar el punto de la ruta normal más cercano al centro de la zona de peligro
     LatLng closestPointOnNormalRoute = normalRoutePolyline.first;
     double minDistanceToZone = double.infinity;
-    int entrySegmentIndex = -1; // Índice del segmento *antes* del punto más cercano
+    int entrySegmentIndex = -1; 
 
     for (int i = 0; i < normalRoutePolyline.length; i++) {
         double dist = _calculateDistanceHaversine(normalRoutePolyline[i], zoneCenter);
@@ -536,35 +535,25 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
         }
     }
 
-    // Si la ruta ya está muy lejos de la zona, no necesitamos desvío.
-    // Convertir radio de grados a metros para la comparación (aproximado)
     double zoneRadiusMeters = zoneRadiusDegrees * 111000; 
-    if (minDistanceToZone > zoneRadiusMeters * 1.5) { // Si el punto más cercano ya está a 1.5x el radio de distancia
+    if (minDistanceToZone > zoneRadiusMeters * 1.5) { 
         print("[DETOUR_CALC] Ruta normal ya está suficientemente lejos de la zona $zoneCenter. No se requieren waypoints de desvío.");
         return [];
     }
     
     print("[DETOUR_CALC] Punto más cercano en ruta normal a zona ($zoneCenter): $closestPointOnNormalRoute. Distancia: ${minDistanceToZone.toStringAsFixed(0)}m");
 
-    // Tomar un punto de la ruta normal "antes" de la zona de peligro y otro "después"
-    // Esto es una simplificación. Idealmente, encontraríamos los puntos exactos de entrada/salida.
     LatLng pointBeforeZone = entrySegmentIndex > 0 ? normalRoutePolyline[entrySegmentIndex] : origin;
     int exitSegmentCandidateIndex = entrySegmentIndex + 2 < normalRoutePolyline.length ? entrySegmentIndex + 2 : normalRoutePolyline.length -1;
     LatLng pointAfterZone = normalRoutePolyline[exitSegmentCandidateIndex];
 
-
-    // Calcular el vector desde el punto "antes" al punto "después" (dirección general de la ruta a través de la zona)
     double routeSegmentDx = pointAfterZone.longitude - pointBeforeZone.longitude;
     double routeSegmentDy = pointAfterZone.latitude - pointBeforeZone.latitude;
-
-    // Calcular un vector perpendicular
     double perpDx = -routeSegmentDy;
     double perpDy = routeSegmentDx;
-
-    // Normalizar el vector perpendicular
     double magnitude = sqrt(perpDx * perpDx + perpDy * perpDy);
-    if (magnitude < 0.00001) { // Si el segmento es muy corto o un punto
-        // Usar la dirección general origen-destino para el perpendicular
+
+    if (magnitude < 0.00001) { 
         perpDx = -(destination.latitude - origin.latitude);
         perpDy = destination.longitude - origin.longitude;
         magnitude = sqrt(perpDx * perpDx + perpDy * perpDy);
@@ -573,22 +562,9 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
     perpDx /= magnitude;
     perpDy /= magnitude;
 
-    // Crear un waypoint de desvío desplazando el centro de la zona perpendicularmente
     double detourDistanceDegrees = DETOUR_OFFSET_DEGREES + zoneRadiusDegrees;
-
-    LatLng detourWaypoint = LatLng(
-        zoneCenter.latitude + perpDy * detourDistanceDegrees,
-        zoneCenter.longitude + perpDx * detourDistanceDegrees
-    );
+    LatLng detourWaypoint = LatLng(zoneCenter.latitude + perpDy * detourDistanceDegrees, zoneCenter.longitude + perpDx * detourDistanceDegrees);
     
-    // Podríamos intentar también al otro lado:
-    // LatLng detourWaypointAlt = LatLng(
-    //     zoneCenter.latitude - perpDy * detourDistanceDegrees,
-    //     zoneCenter.longitude - perpDx * detourDistanceDegrees
-    // );
-    // Y luego elegir el que resulte en una ruta más corta o evaluar ambas.
-    // Por simplicidad, solo usamos un lado.
-
     detourWaypoints.add(detourWaypoint);
     print("[DETOUR_CALC] Waypoint de desvío generado: $detourWaypoint");
     return detourWaypoints;
@@ -645,53 +621,52 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> {
         return;
     }
 
-    // 2. Lógica de evitación basada en congestión
-    List<Map<String, dynamic>> highRiskReports = _allActiveReports.where((reporte) {
-      final nivelRiesgo = reporte['nivelRiesgo']?.toString().toLowerCase() ?? '';
-      return (nivelRiesgo.contains('alto') || nivelRiesgo.contains('high'));
+    // 2. Lógica de evitación: ahora considera CUALQUIER reporte filtrado por tiempo cercano
+    List<Map<String, dynamic>> reportsNearRouteForAvoidance = _filteredActiveReports.where((reporte) {
+      final ubicacion = reporte['ubicacion']; 
+      LatLng puntoReporte = LatLng(ubicacion['latitud'].toDouble(), ubicacion['longitud'].toDouble());
+      // Verificar si el reporte está cerca de CUALQUIER punto de la ruta normal
+      for (LatLng routePoint in normalRouteData.coordinates) {
+          if (_calculateDistanceHaversine(routePoint, puntoReporte) < REPORT_INFLUENCE_RADIUS_METERS) {
+              return true; // Este reporte está lo suficientemente cerca de la ruta normal
+          }
+      }
+      return false;
     }).toList();
 
-    if (highRiskReports.length >= MIN_REPORTS_FOR_CONGESTION) {
-        print("--- [AVOIDANCE] Detectada posible congestión (${highRiskReports.length} reportes alto riesgo). ---");
+
+    if (reportsNearRouteForAvoidance.isNotEmpty) {
+        print("--- [AVOIDANCE] ${reportsNearRouteForAvoidance.length} reporte(s) cercano(s) a la ruta normal. Intentando desvío. ---");
         
+        // Calcular un centroide de todos los reportes problemáticos para definir la zona a evitar
         double sumLat = 0, sumLng = 0;
-        for(var r in highRiskReports) { sumLat += r['ubicacion']['latitud']; sumLng += r['ubicacion']['longitud']; }
-        LatLng mainCongestionCenter = LatLng(sumLat / highRiskReports.length, sumLng / highRiskReports.length);
-        print("[AVOIDANCE] Centro de congestión principal (simplificado): $mainCongestionCenter");
-
-        bool normalRouteIntersectsCongestion = false;
-        for(LatLng routePoint in normalRouteData.coordinates) {
-            if (_calculateDistanceHaversine(routePoint, mainCongestionCenter) < CONGESTION_ZONE_RADIUS_DEGREES * 111000 * 1.1) { // 1.1 de margen
-                normalRouteIntersectsCongestion = true;
-                break;
-            }
+        for(var r in reportsNearRouteForAvoidance) { 
+            sumLat += r['ubicacion']['latitud'];
+            sumLng += r['ubicacion']['longitud']; 
         }
+        LatLng mainCongestionCenter = LatLng(sumLat / reportsNearRouteForAvoidance.length, sumLng / reportsNearRouteForAvoidance.length);
+        print("[AVOIDANCE] Centro de zona a evitar (basado en reportes cercanos): $mainCongestionCenter");
         
-        if (normalRouteIntersectsCongestion) {
-            print("[AVOIDANCE] Ruta normal INTERSECTA la zona de congestión. Calculando desvío...");
-            List<LatLng> detourWps = _calculateDetourWaypointsForZone(
-                _origenLatLng!, _destinoLatLng!, 
-                mainCongestionCenter, CONGESTION_ZONE_RADIUS_DEGREES,
-                normalRouteData.coordinates
-            );
+        List<LatLng> detourWps = _calculateDetourWaypointsForZone(
+            _origenLatLng!, _destinoLatLng!, 
+            mainCongestionCenter, DETOUR_CALCULATION_RADIUS_DEGREES, // Usar el radio para el cálculo del desvío
+            normalRouteData.coordinates
+        );
 
-            if (detourWps.isNotEmpty) {
-                await _getAndDisplayRoute(
-                    origin: _origenLatLng!, destination: _destinoLatLng!, 
-                    routeType: RouteType.safe, detourWaypoints: detourWps
-                );
-                return; 
-            } else {
-               print("[AVOIDANCE] No se pudieron calcular waypoints de desvío. Intentando alternativa de Google.");
-            }
+        if (detourWps.isNotEmpty) {
+            await _getAndDisplayRoute(
+                origin: _origenLatLng!, destination: _destinoLatLng!, 
+                routeType: RouteType.safe, detourWaypoints: detourWps
+            );
+            return; 
         } else {
-            print("[AVOIDANCE] Ruta normal NO intersecta la zona de congestión. Mostrando ruta normal como segura o alternativa de Google.");
+           print("[AVOIDANCE] No se pudieron calcular waypoints de desvío. Intentando alternativa de Google.");
         }
     } else {
-        print("[AVOIDANCE] No hay congestión significativa (${highRiskReports.length} reportes alto riesgo).");
+        print("[AVOIDANCE] Ningún reporte (filtrado por tiempo) está lo suficientemente cerca de la ruta normal para requerir desvío.");
     }
     
-    // Fallback: si no hay congestión, o el desvío falló, o la ruta normal no intersecta,
+    // Fallback: si no hay reportes cercanos que justifiquen desvío, o el desvío falló,
     // intentar una alternativa de Google para la "Ruta Segura"
     print("[AVOIDANCE_FALLBACK] Intentando con &alternatives=true para Ruta Segura.");
     await _getAndDisplayRoute(origin: _origenLatLng!, destination: _destinoLatLng!, routeType: RouteType.safe, fetchAlternativesForSafeRoute: true);

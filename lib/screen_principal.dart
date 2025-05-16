@@ -10,6 +10,7 @@ import '../widgets/LeyendaMapa.dart';
 import '../widgets/alternar_boton.dart';
 import '../widgets/botonEmergencia.dart';
 import 'screen_secundario.dart';
+import 'screenRutaSegura.dart';
 
 class ScreenPrincipal extends StatefulWidget {
   const ScreenPrincipal({super.key});
@@ -275,15 +276,50 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             ),
           ),
           Positioned(
-            top: 100,
-            right: 20,
-            child: SafeArea(
-              child: AlternarBoton(
-                onPressed: _navigateToSecondaryScreen,
-                tooltip: 'Ver pantalla secundaria',
-              ),
+          top: 100,
+          right: 20,
+          child: SafeArea(
+            child: AlternarBoton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ScreenRutaSegura()),
+                );
+              },
+              tooltip: 'Ver pantalla secundaria',
             ),
           ),
+        ),
+          // Positioned(
+          //   top: 100,
+          //   right: 20,
+          //   child: SafeArea(
+          //     child: AlternarBoton(
+          //       onPressed: _navigateToSecondaryScreen,
+          //       tooltip: 'Ver pantalla secundaria',
+          //     ),
+          //   ),
+          // ),
+            //           Positioned(
+            //   bottom: 100,
+            //   left: 20,
+            //   child: ElevatedButton.icon(
+            //     icon: const Icon(Icons.directions),
+            //     label: const Text("Ruta Segura"),
+            //     style: ElevatedButton.styleFrom(
+            //       backgroundColor: Colors.blueAccent,
+            //       foregroundColor: Colors.white,
+            //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            //       shape: RoundedRectangleBorder(
+            //         borderRadius: BorderRadius.circular(12),
+            //       ),
+            //     ),
+            //     onPressed: () {
+            //       Navigator.of(context).push(
+            //         MaterialPageRoute(builder: (context) => const ScreenRutaSegura()),
+            //       );
+            //     },
+            //   ),
+            // ),
           Positioned( 
             bottom: 20,
             right: 20,
