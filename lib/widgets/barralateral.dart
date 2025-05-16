@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/reporteformulario.dart';
+import '../screens/fake_report_map_screen.dart'; // Asegúrate que la ruta sea correcta
 
 class BarraLateral extends StatelessWidget {
   final VoidCallback onLogout;
@@ -27,15 +28,13 @@ class BarraLateral extends StatelessWidget {
             ),
           ),
           
-          // Elemento para reportar incidente (ahora navega directamente)
           ListTile(
-            leading: const Icon(Icons.add_circle, color: Colors.blue),
-            title: const Text('Reportar Incidente', 
-              style: TextStyle(fontWeight: FontWeight.bold),
+            leading: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
+            title: const Text('Reportar Incidente (Formulario)', 
+              style: TextStyle(fontWeight: FontWeight.w500),
             ),
             onTap: () {
-              Navigator.pop(context); // Cierra el drawer
-              // Navega directamente al formulario de reporte
+              Navigator.pop(context); 
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -45,10 +44,28 @@ class BarraLateral extends StatelessWidget {
             },
           ),
 
+          // NUEVO ELEMENTO PARA LA PANTALLA DE REPORTES FALSOS
+          ListTile(
+            leading: Icon(Icons.map_outlined, color: Colors.orange.shade700),
+            title: const Text('Generar Reportes (Mapa)',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            onTap: () {
+              Navigator.pop(context); // Cierra el drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const FakeReportMapScreen(), // Navega a la nueva pantalla
+                ),
+              );
+            },
+          ),
+          // FIN DEL NUEVO ELEMENTO
+
           const Divider(),
           
           ListTile(
-            leading: const Icon(Icons.warning_amber),
+            leading: const Icon(Icons.warning_amber_outlined),
             title: const Text('Desactivar Alerta'),
             onTap: () {
               Navigator.pop(context);
@@ -56,7 +73,7 @@ class BarraLateral extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.pause_circle),
+            leading: const Icon(Icons.pause_circle_outline),
             title: const Text('Suspender Cuenta'),
             onTap: () {
               Navigator.pop(context);
@@ -64,7 +81,7 @@ class BarraLateral extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.bug_report),
+            leading: const Icon(Icons.bug_report_outlined),
             title: const Text('Reportar Bug'),
             onTap: () {
               Navigator.pop(context);
@@ -75,10 +92,10 @@ class BarraLateral extends StatelessWidget {
           const Spacer(),
 
           ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
+            leading: const Icon(Icons.logout, color: Colors.redAccent),
             title: const Text(
               'Cerrar Sesión',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w500),
             ),
             onTap: onLogout,
           ),
