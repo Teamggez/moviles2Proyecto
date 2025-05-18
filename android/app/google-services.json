@@ -23,6 +23,25 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:871678023262:android:adf1bcb2249277189a06cf",
+        "android_client_info": {
+          "package_name": "com.mundoTech_devs.proyectomovilesii"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAygb3Q6WW8ZOo5mW5IfXzQnse8ExQHGtg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
