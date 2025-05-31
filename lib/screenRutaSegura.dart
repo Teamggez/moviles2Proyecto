@@ -614,8 +614,9 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
     }
 
     String url = 'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&language=es&key=$googleMapsApiKey';
-    if (detourWaypoints.isNotEmpty) url += '&waypoints=${detourWaypoints.map((p) => "via:${p.latitude},${p.longitude}").join('|')}';
-    else if (routeType == RouteType.safe && fetchAlternativesForSafeRoute) url += '&alternatives=true';
+    if (detourWaypoints.isNotEmpty) {
+      url += '&waypoints=${detourWaypoints.map((p) => "via:${p.latitude},${p.longitude}").join('|')}';
+    } else if (routeType == RouteType.safe && fetchAlternativesForSafeRoute) url += '&alternatives=true';
 
     try {
       final response = await http.get(Uri.parse(url));
@@ -644,11 +645,17 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
 
               if (mounted) {
                 setState(() {
-                  if (routeType == RouteType.normal) _polylines.removeWhere((p) => p.polylineId.value == _normalRouteId);
-                  else _polylines.removeWhere((p) => p.polylineId.value.startsWith(_safeRouteId));
+                  if (routeType == RouteType.normal) {
+                    _polylines.removeWhere((p) => p.polylineId.value == _normalRouteId);
+                  } else {
+                    _polylines.removeWhere((p) => p.polylineId.value.startsWith(_safeRouteId));
+                  }
                   _polylines.add(Polyline(polylineId: PolylineId(polylineIdStr), points: routeCoordinates, color: routeColor, width: 6, zIndex: routeZIndex.toInt()));
-                  if (routeType == RouteType.normal) _normalRouteInfo = "$distanceText, $durationText";
-                  else _safeRouteInfo = "$distanceText, $durationText ${detourWaypoints.isNotEmpty ? '(Ruta Segura con Desvío)' : '(Ruta Segura - Alternativa Google)'}";
+                  if (routeType == RouteType.normal) {
+                    _normalRouteInfo = "$distanceText, $durationText";
+                  } else {
+                    _safeRouteInfo = "$distanceText, $durationText ${detourWaypoints.isNotEmpty ? '(Ruta Segura con Desvío)' : '(Ruta Segura - Alternativa Google)'}";
+                  }
                 });
                 bool shouldAnimate = (routeType == RouteType.normal && _polylines.where((p)=> p.polylineId.value.startsWith(_safeRouteId)).isEmpty) || (routeType == RouteType.safe);
                 if (shouldAnimate || _polylines.length == 1) {
@@ -1053,8 +1060,9 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
       left: 0, right: 0, bottom: 0,
       child: GestureDetector(
         onVerticalDragUpdate: (details) { 
-          if (details.primaryDelta! > 0 && _isPanelExpanded) _toggleReportPanelExpansion();
-          else if (details.primaryDelta! < 0 && !_isPanelExpanded) _toggleReportPanelExpansion();
+          if (details.primaryDelta! > 0 && _isPanelExpanded) {
+            _toggleReportPanelExpansion();
+          } else if (details.primaryDelta! < 0 && !_isPanelExpanded) _toggleReportPanelExpansion();
         },
         child: AnimatedBuilder(
           animation: _panelAnimation!,
@@ -1292,7 +1300,7 @@ class _ScreenRutaSeguraState extends State<ScreenRutaSegura> with SingleTickerPr
             ),
           ),
 
-          Positioned(
+          const Positioned(
             bottom: 20, right: 20,
             child: SafeArea(child: EmergencyButton()),
           ),

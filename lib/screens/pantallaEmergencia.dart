@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/servicioEmergencia.dart';
+import '../services/servicioSMS.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EmergencyDirectoryScreen extends StatefulWidget {
@@ -12,6 +13,7 @@ class EmergencyDirectoryScreen extends StatefulWidget {
 
 class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
   final EmergencyService emergencyService = EmergencyService();
+  final SmsLogic smsLogic = SmsLogic();
 
   void _makeCall(String phoneNumber, BuildContext context) async {
     final String sanitizedPhoneNumber =
@@ -204,6 +206,15 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
                   icon: const Icon(Icons.call),
                   onPressed: () => _makeCall(contact['phone'], context),
                 ),
+                if (contact['isPersonal'] == true)
+                  IconButton(
+                    icon: const Icon(Icons.sms),
+                    onPressed: () => smsLogic.sendSMS(
+                      contact['phone'],
+                      '¡Emergencia! Necesito ayuda, por favor contáctame.',
+                      context,
+                    ),
+                  ),
                 IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () => _showEditDialog(context, contact),
@@ -215,7 +226,6 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
               ],
             ),
           );
-
         },
         onReorder: (oldIndex, newIndex) {
           setState(() {
