@@ -79,7 +79,7 @@ class SmsLogic {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('No se pudo abrir la app de SMS para $phoneNumber'),
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.red, 
             ),
           );
         }
