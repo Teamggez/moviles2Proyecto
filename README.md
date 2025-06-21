@@ -46,3 +46,11 @@ Estamos utilizando Firebase para manejar la autenticación de usuarios. Aquí se
 
 Colección: `usuarios`
 
+### IOS 
+-  flutter clean
+-  flutter pub get
+-  cd ios
+-  pod install
+-  open XCODE.WORKSPACE
+-  archive
+
