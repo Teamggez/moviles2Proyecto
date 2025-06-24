@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/reporteformulario.dart';
-// import '../screens/fake_report_map_screen.dart';
+import '../screens/alert_settings_screen.dart';
+import '../screens/fake_report_map_screen.dart';
 
 class BarraLateral extends StatelessWidget {
   final VoidCallback onLogout;
@@ -44,64 +45,45 @@ class BarraLateral extends StatelessWidget {
             },
           ),
 
-        // NUEVO ELEMENTO PARA LA PANTALLA DE REPORTES FALSOS
-        // ListTile(
-        //   leading: Icon(Icons.map_outlined, color: Colors.orange.shade700),
-        //   title: const Text(
-        //     'Generar Reportes (Mapa)',
-        //     style: TextStyle(fontWeight: FontWeight.w500),
-        //   ),
-        //   onTap: () {
-        //     Navigator.pop(context); // Cierra el drawer
-        //     Navigator.push(
-        //       context,
-        //       MaterialPageRoute(
-        //         builder: (context) => const FakeReportMapScreen(), // Navega a la nueva pantalla
-        //       ),
-        //     );
-        //   },
-        // ),
-        // FIN DEL NUEVO ELEMENTO
-
-
-          const Divider(),
-          
           ListTile(
-            leading: const Icon(Icons.warning_amber_outlined),
-            title: const Text('Desactivar Alerta'),
+            leading: Icon(Icons.settings_outlined, color: Colors.green.shade700),
+            title: const Text('Configuración de Alertas', 
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             onTap: () {
-              Navigator.pop(context);
-              // Acción a implementar
+              Navigator.pop(context); 
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AlertSettingsScreen(),
+                ),
+              );
             },
           ),
+
           ListTile(
-            leading: const Icon(Icons.pause_circle_outline),
-            title: const Text('Suspender Cuenta'),
+            leading: Icon(Icons.map_outlined, color: Colors.purple.shade700),
+            title: const Text('Generar Reportes (Mapa)', 
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             onTap: () {
-              Navigator.pop(context);
-              // Acción a implementar
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('Reportar Bug'),
-            onTap: () {
-              Navigator.pop(context);
-              // Acción a implementar
+              Navigator.pop(context); 
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const FakeReportMapScreen(),
+                ),
+              );
             },
           ),
 
           const Spacer(),
-
+          
           ListTile(
-            leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text(
-              'Cerrar Sesión',
-              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w500),
-            ),
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Cerrar Sesión'),
             onTap: onLogout,
           ),
-          const SizedBox(height: 20),
         ],
       ),
     );

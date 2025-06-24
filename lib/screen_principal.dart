@@ -2,13 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../services/custom_heatmap.dart';
+import '../services/location_service.dart';
 import '../widgets/barralateral.dart';
-import '../widgets/LeyendaMapa.dart'; // Asegúrate que esta ruta sea correcta
+import '../widgets/LeyendaMapa.dart';
 import '../widgets/alternar_boton.dart';
 import '../widgets/botonEmergencia.dart';
-// import 'screen_secundario.dart'; // Comentado si _navigateToSecondaryScreen no se usa
 import 'screenRutaSegura.dart';
 
 class ScreenPrincipal extends StatefulWidget {
@@ -25,6 +27,11 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
   Set<TileOverlay> _tileOverlays = {};
   bool _isLoadingReportData = true;
   List<ReportPoint> _allReportPoints = [];
+
+  // Servicios
+  final LocationService _locationService = LocationService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   static const CameraPosition _kInitialPosition = CameraPosition(
     target: LatLng(-18.0146, -70.2534),
@@ -48,7 +55,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
     setState(() {
       _isLoadingReportData = true;
       _allReportPoints = [];
-      _tileOverlays = {}; // Limpiar overlays al recargar
+      _tileOverlays = {};
     });
 
     try {
@@ -78,7 +85,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
           _allReportPoints = tempData;
           _isLoadingReportData = false;
         });
-        _updateTileOverlay(); // Llamar después de actualizar _allReportPoints
+        _updateTileOverlay();
       }
     } catch (e) {
       if (mounted) {
@@ -131,7 +138,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
         });
       }
     }
-    _mapController?.animateCamera(CameraUpdate.zoomBy(0.000001)); // Pequeño cambio para forzar redibujo
+    _mapController?.animateCamera(CameraUpdate.zoomBy(0.000001));
   }
 
   void _toggleLeyenda() {
@@ -148,19 +155,88 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
     });
   }
 
-  void _handleLogout() {
+  Future<void> _handleLogout() async {
     if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-  }
 
-  // Si _navigateToSecondaryScreen no se usa, se puede eliminar.
-  // void _navigateToSecondaryScreen() {
-  //   if (!mounted) return;
-  //   Navigator.pushReplacement(
-  //     context,
-  //     MaterialPageRoute(builder: (context) => const ScreenSecundario()),
-  //   );
-  // }
+    // Mostrar diálogo de confirmación
+    bool? shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red.shade600),
+              const SizedBox(width: 8),
+              const Text('Cerrar Sesión'),
+            ],
+          ),
+          content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Cerrar Sesión'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout == true && mounted) {
+      try {
+        // Mostrar indicador de carga
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // Detener servicios
+        _locationService.stopLocationTracking();
+
+        // Cerrar sesión de Firebase Auth
+        await _auth.signOut();
+
+        // Cerrar sesión de Google Sign-In
+        await _googleSignIn.signOut();
+
+        if (mounted) {
+          // Cerrar el diálogo de carga
+          Navigator.of(context).pop();
+
+          // Navegar a la pantalla de login y limpiar el stack
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/',
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          // Cerrar el diálogo de carga si está abierto
+          Navigator.of(context).pop();
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al cerrar sesión: $e'),
+              backgroundColor: Colors.red.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
+    }
+  }
 
   void _zoomIn() {
     _mapController?.animateCamera(CameraUpdate.zoomIn());
@@ -185,7 +261,6 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             mapType: MapType.normal,
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
-              // Forzar una actualización inicial del tile overlay si los datos ya están cargados
               if (!_isLoadingReportData) {
                 _updateTileOverlay();
               }
@@ -280,8 +355,8 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             child: SafeArea(
               child: AlternarBoton(
                 onPressed: () {
-                  if (mounted) { // Verificar `mounted` antes de la navegación
-                    Navigator.of(context).pushReplacement( // Usar pushReplacement si no se quiere volver
+                  if (mounted) {
+                    Navigator.of(context).pushReplacement(
                       MaterialPageRoute(builder: (context) => const ScreenRutaSegura()),
                     );
                   }
