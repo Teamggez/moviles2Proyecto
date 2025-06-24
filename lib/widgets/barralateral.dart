@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../screens/reporteformulario.dart';
 import '../screens/alert_settings_screen.dart';
 import '../screens/fake_report_map_screen.dart';
+import '../screens/noticias_screen.dart';
 
 class BarraLateral extends StatelessWidget {
   final VoidCallback onLogout;
@@ -40,6 +41,22 @@ class BarraLateral extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const ReporteFormularioScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.article_outlined, color: Colors.teal.shade700),
+            title: const Text(
+              'Noticias',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            onTap: () {
+              Navigator.pop(context); // Cierra el drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NoticiasScreen(), // Navega a la pantalla de noticias
                 ),
               );
             },
