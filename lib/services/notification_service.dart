@@ -1,17 +1,12 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../screens/report_detail_screen.dart';
 
 class NotificationService {
   static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
-  // Clave global para navegación
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   static Future<void> initialize() async {
-    // Solicitar permisos
     NotificationSettings settings = await _firebaseMessaging.requestPermission(
       alert: true,
       announcement: false,
@@ -23,42 +18,36 @@ class NotificationService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('Usuario otorgó permisos para notificaciones');
-      
-      // Configurar handlers
+      print('Usuario otorgo permisos para notificaciones');
       await _setupNotificationHandlers();
     } else {
-      print('Usuario denegó permisos para notificaciones');
+      print('Usuario denego permisos para notificaciones');
     }
   }
 
   static Future<void> _setupNotificationHandlers() async {
-    // Cuando la app está en foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Notificación recibida en foreground: ${message.data}');
+      print('Notificacion recibida en foreground: ${message.notification?.title} - ${message.data}');
       _showInAppNotification(message);
     });
 
-    // Cuando la app está en background y se toca la notificación
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Notificación tocada desde background: ${message.data}');
+      print('Notificacion tocada desde background: ${message.data}');
       _handleNotificationTap(message);
     });
 
-    // Cuando la app está completamente cerrada y se toca la notificación
     RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
     if (initialMessage != null) {
-      print('App abierta desde notificación: ${initialMessage.data}');
-      // Esperar un poco para que la app se inicialice completamente
-      Future.delayed(const Duration(seconds: 2), () {
-        _handleNotificationTap(initialMessage);
+      print('App abierta desde notificacion (initialMessage): ${initialMessage.data}');
+      Future.delayed(const Duration(milliseconds: 500), () {
+         _handleNotificationTap(initialMessage);
       });
     }
   }
 
   static void _showInAppNotification(RemoteMessage message) {
     final context = navigatorKey.currentContext;
-    if (context != null) {
+    if (context != null && message.notification != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Column(
@@ -66,57 +55,48 @@ class NotificationService {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                message.notification?.title ?? 'Nueva Alerta',
+                message.notification!.title ?? 'Nueva Alerta',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text(message.notification?.body ?? 'Tienes un nuevo reporte cerca'),
+              Text(message.notification!.body ?? 'Tienes un nuevo reporte cerca'),
             ],
           ),
           action: SnackBarAction(
             label: 'Ver',
-            onPressed: () => _handleNotificationTap(message),
+            onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                _handleNotificationTap(message);
+            }
           ),
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 7),
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
-  static Future<void> _handleNotificationTap(RemoteMessage message) async {
-    final context = navigatorKey.currentContext;
-    if (context == null) return;
+  static void _handleNotificationTap(RemoteMessage message) {
+    final reportIdFromPayload = message.data['report_id'] as String?;
+    print("NotificationService: _handleNotificationTap. report_id del payload: '$reportIdFromPayload'");
 
-    try {
-      // Extraer el ID del reporte desde los datos de la notificación
-      String? reportId = message.data['report_id'] ?? message.data['reporte_id'];
-      
-      if (reportId != null) {
-        // Buscar el reporte en Firestore
-        DocumentSnapshot reportDoc = await _firestore
-            .collection('reportes')
-            .doc(reportId)
-            .get();
-
-        if (reportDoc.exists) {
-          // Navegar a la pantalla de detalle del reporte
-          Navigator.of(context).push(
+    if (reportIdFromPayload != null && reportIdFromPayload.isNotEmpty) {
+      final currentState = navigatorKey.currentState;
+      if (currentState != null) {
+          print("NotificationService: Navegando a ReportDetailsScreen con ID: '$reportIdFromPayload'");
+          currentState.push(
             MaterialPageRoute(
-              builder: (context) => ReportDetailsScreen(
-                reportId: reportId,
-                reportData: reportDoc.data() as Map<String, dynamic>,
-              ),
+              builder: (_) => ReportDetailsScreen(reportId: reportIdFromPayload),
             ),
           );
-        } else {
-          _showErrorSnackBar(context, 'No se pudo encontrar el reporte');
-        }
       } else {
-        _showErrorSnackBar(context, 'Información de reporte no disponible');
+          print("NotificationService: navigatorKey.currentState es null. No se puede navegar.");
       }
-    } catch (e) {
-      print('Error al manejar notificación: $e');
-      _showErrorSnackBar(context, 'Error al abrir el reporte');
+    } else {
+      print('NotificationService: report_id NO encontrado en el payload de datos o esta vacio.');
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        _showErrorSnackBar(context, 'Informacion de reporte no disponible en la notificacion.');
+      }
     }
   }
 
