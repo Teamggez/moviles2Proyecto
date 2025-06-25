@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/servicioEmergencia.dart';
+import '../services/servicioSMS.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EmergencyDirectoryScreen extends StatefulWidget {
@@ -12,6 +14,30 @@ class EmergencyDirectoryScreen extends StatefulWidget {
 
 class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
   final EmergencyService emergencyService = EmergencyService();
+  final SmsLogic smsLogic = SmsLogic();
+  String _smsMessage = '¡Emergencia! Necesito ayuda, por favor contáctame.';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSmsMessage();
+  }
+
+  Future<void> _loadSmsMessage() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _smsMessage = prefs.getString('smsMessage') ??
+          '¡Emergencia! Necesito ayuda, por favor contáctame.';
+    });
+  }
+
+  Future<void> _saveSmsMessage(String message) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('smsMessage', message);
+    setState(() {
+      _smsMessage = message;
+    });
+  }
 
   void _makeCall(String phoneNumber, BuildContext context) async {
     final String sanitizedPhoneNumber =
@@ -144,19 +170,61 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
                   );
 
                   if (context.mounted) {
-                    setState(() {}); // Recargar UI
+                    setState(() {});
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('$name agregado correctamente'),
                         backgroundColor: Colors.green,
                       ),
                     );
-                    Navigator.of(context).pop(); // Cerrar diálogo
+                    Navigator.of(context).pop();
                   }
                 }
               },
               child: const Text('Agregar'),
             )
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showEditSmsDialog(BuildContext context) async {
+    final smsController = TextEditingController(text: _smsMessage);
+
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Editar Mensaje SMS'),
+          content: TextField(
+            controller: smsController,
+            decoration: const InputDecoration(labelText: 'Mensaje de Emergencia'),
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: Navigator.of(context).pop,
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                final message = smsController.text.trim();
+                if (message.isNotEmpty) {
+                  _saveSmsMessage(message);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Mensaje SMS actualizado correctamente'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    Navigator.of(context).pop();
+                  }
+                }
+              },
+              child: const Text('Guardar'),
+            ),
           ],
         );
       },
@@ -187,47 +255,74 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
         elevation: 2,
       ),
       backgroundColor: Colors.grey[100],
-      body: ReorderableListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-        itemCount: contacts.length,
-        itemBuilder: (context, index) {
-          final contact = contacts[index];
-          return ListTile(
-            key: ValueKey(contact['id']),
-            leading: Icon(emergencyService.getIconFromName(contact['iconName'])),
-            title: Text(contact['name']),
-            subtitle: Text(contact['phone']),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.call),
-                  onPressed: () => _makeCall(contact['phone'], context),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => _showEditDialog(context, contact),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () => _deleteContact(contact['id']),
-                ),
-              ],
-            ),
-          );
-
-        },
-        onReorder: (oldIndex, newIndex) {
-          setState(() {
-            emergencyService.reorderEmergencyContact(oldIndex, newIndex);
-          });
-        },
+      body: Padding(
+        padding: const EdgeInsets.only(bottom: 120.0), // Ajusta este valor según sea necesario
+        child: ReorderableListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+          itemCount: contacts.length,
+          itemBuilder: (context, index) {
+            final contact = contacts[index];
+            return ListTile(
+              key: ValueKey(contact['id']),
+              leading: Icon(emergencyService.getIconFromName(contact['iconName'])),
+              title: Text(contact['name']),
+              subtitle: Text(contact['phone']),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.call),
+                    onPressed: () => _makeCall(contact['phone'], context),
+                  ),
+                  if (contact['isPersonal'] == true)
+                    IconButton(
+                      icon: const Icon(Icons.sms),
+                      onPressed: () => smsLogic.sendSMS(
+                        contact['phone'],
+                        _smsMessage,
+                        context,
+                      ),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () => _showEditDialog(context, contact),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () => _deleteContact(contact['id']),
+                  ),
+                ],
+              ),
+            );
+          },
+          onReorder: (oldIndex, newIndex) {
+            setState(() {
+              emergencyService.reorderEmergencyContact(oldIndex, newIndex);
+            });
+          },
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddContactDialog(context),
-        label: const Text('Agregar'),
-        icon: const Icon(Icons.add),
-        backgroundColor: theme.primaryColor,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: () => _showAddContactDialog(context),
+            label: const Text('Agregar'),
+            icon: const Icon(Icons.add),
+            backgroundColor: theme.primaryColor,
+            heroTag: 'addContact',
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.extended(
+            onPressed: () => _showEditSmsDialog(context),
+            label: const Text('Editar SMS'),
+            icon: const Icon(Icons.message),
+            backgroundColor: theme.primaryColor,
+            heroTag: 'editSms',
+          ),
+        ],
       ),
     );
   }
