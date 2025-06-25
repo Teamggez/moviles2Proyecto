@@ -3,19 +3,21 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'services/location_service.dart';
+import 'services/notification_service.dart';
+import 'services/auth_service.dart';
 import 'firebase_options.dart';
 import 'screen_principal.dart';
-import '/screens/report_detail_screen.dart';
-import 'dart:convert';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Inicializar notificaciones
+  await NotificationService.initialize();
+
   runApp(const MainApp());
 }
 
@@ -26,6 +28,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AlertaTacna',
+      navigatorKey: NotificationService.navigatorKey,
       theme: ThemeData(
         primarySwatch: Colors.blue,
         primaryColor: const Color(0xFF1E3A8A),
@@ -41,38 +44,70 @@ class MainApp extends StatelessWidget {
           bodyMedium: TextStyle(fontWeight: FontWeight.w400),
         ),
       ),
-      home: const AuthWrapper(),
+      // Configurar rutas nombradas
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const AuthWrapper(),
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const ScreenPrincipal(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
   @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool? _isLoggedIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthState();
+    
+    // Escuchar cambios de estado de autenticación
+    AuthService.authStateChanges.listen((isLoggedIn) {
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = isLoggedIn;
+        });
+      }
+    });
+  }
+
+  Future<void> _checkAuthState() async {
+    final isLoggedIn = await AuthService.isLoggedIn();
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = isLoggedIn;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Color(0xFF0F172A),
-            body: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
-              ),
-            ),
-          );
-        }
-        
-        if (snapshot.hasData) {
-          return const ScreenPrincipal();
-        }
-        
-        return const LoginScreen();
-      },
-    );
+    if (_isLoggedIn == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+          ),
+        ),
+      );
+    }
+    
+    if (_isLoggedIn!) {
+      return const ScreenPrincipal();
+    }
+    
+    return const LoginScreen();
   }
 }
 
@@ -112,10 +147,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   // Firebase
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   final LocationService _locationService = LocationService();
 
   // Contenido dinámico
@@ -124,19 +155,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       'icon': Icons.shield_outlined,
       'title': 'Seguridad Inteligente',
       'subtitle': 'Protección comunitaria con tecnología avanzada de alertas en tiempo real.',
-      'gradient': [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+      'gradient': [const Color(0xFF1E3A8A), const Color(0xFF3B82F6)],
     },
     {
       'icon': Icons.location_on_outlined,
       'title': 'Alertas de Proximidad',
       'subtitle': 'Recibe notificaciones automáticas cuando te acerques a zonas de riesgo.',
-      'gradient': [Color(0xFF7C3AED), Color(0xFFA855F7)],
+      'gradient': [const Color(0xFF7C3AED), const Color(0xFFA855F7)],
     },
     {
       'icon': Icons.people_outline,
       'title': 'Red Colaborativa',
       'subtitle': 'Únete a tu comunidad para crear un entorno más seguro para todos.',
-      'gradient': [Color(0xFF059669), Color(0xFF10B981)],
+      'gradient': [const Color(0xFF059669), const Color(0xFF10B981)],
     },
   ];
 
@@ -146,7 +177,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   void initState() {
     super.initState();
     _initializeAnimations();
-    _setupFCM();
     _startContentRotation();
   }
 
@@ -239,7 +269,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     super.dispose();
   }
 
-  // Funciones de autenticación
+  // Login con credenciales (sistema original)
   Future<void> _login() async {
     if (_loginFormKey.currentState!.validate()) {
       setState(() => _isLoggingIn = true);
@@ -248,6 +278,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         String email = _emailLoginController.text.trim();
         String password = _passwordLoginController.text.trim();
 
+        // Verificar credenciales en Firestore (sistema original)
         QuerySnapshot querySnapshot = await _firestore
             .collection('usuarios')
             .where('correo', isEqualTo: email)
@@ -255,7 +286,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             .get();
 
         if (querySnapshot.docs.isNotEmpty && mounted) {
+          // Guardar estado de login
+          await AuthService.saveCredentialLogin(email);
           await _startUserServices(email);
+          
+          // Navegar a home
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed('/home');
+          }
         } else if (mounted) {
           _showErrorSnackBar('Credenciales incorrectas');
         }
@@ -324,23 +362,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     setState(() => _isGoogleSignIn = true);
 
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final userCredential = await AuthService.signInWithGoogle();
       
-      if (googleUser == null) {
-        if (mounted) setState(() => _isGoogleSignIn = false);
-        return;
-      }
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
-      
-      if (userCredential.user != null) {
+      if (userCredential != null && userCredential.user != null) {
         await _createOrUpdateUserDocument(userCredential.user!);
+        // Guardar estado de login con Google
+        await AuthService.saveGoogleLogin(userCredential.user!.email!);
+        
+        // Navegar a home
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -376,144 +408,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     await _startUserServices(user.email!);
   }
 
-  // Configuración FCM
-  Future<void> _setupFCM() async {
-    try {
-      NotificationSettings settings = await _messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
-
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        await _setupLocalNotifications();
-        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-        FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
-      }
-    } catch (e) {
-      debugPrint('FCM: Error configurando: $e');
-    }
-  }
-
-  Future<void> _setupLocalNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
-        );
-
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
-
-    await _localNotifications.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (response.payload != null) {
-          final data = json.decode(response.payload!);
-          final reportId = data['report_id'];
-          if (reportId != null) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ReportDetailScreen(
-                  reportId: reportId,
-                  reportData: data,
-                ),
-              ),
-            );
-          }
-        }
-      },
-    );
-  }
-
-  void _handleForegroundMessage(RemoteMessage message) {
-    if (message.notification != null) {
-      _showLocalNotification(message);
-    }
-  }
-
-  void _handleMessageOpenedApp(RemoteMessage message) {
-    if (message.data['type'] == 'proximity_alert') {
-      final reportId = message.data['report_id'];
-      if (reportId != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ReportDetailScreen(
-              reportId: reportId,
-              reportData: {
-                'id': message.data['report_id'],
-                'tipo': message.data['report_type'],
-                'titulo': message.data['report_title'],
-                'nivelRiesgo': message.data['risk_level'],
-                'ubicacion': {
-                  'latitud': double.tryParse(message.data['latitude'] ?? '0') ?? 0,
-                  'longitud': double.tryParse(message.data['longitude'] ?? '0') ?? 0,
-                },
-              },
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _showLocalNotification(RemoteMessage message) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-          'proximity_alerts',
-          'Alertas de Proximidad',
-          channelDescription: 'Notificaciones de reportes cercanos',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        );
-
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: DarwinNotificationDetails(),
-    );
-
-    final payload = json.encode({
-      'report_id': message.data['report_id'],
-      'report_type': message.data['report_type'],
-      'report_title': message.data['report_title'],
-      'risk_level': message.data['risk_level'],
-      'latitude': message.data['latitude'],
-      'longitude': message.data['longitude'],
-    });
-
-    await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      message.notification?.title ?? 'Alerta de Proximidad',
-      message.notification?.body ?? 'Hay un reporte cerca de tu ubicación',
-      platformChannelSpecifics,
-      payload: payload,
-    );
-  }
-
-  Future<void> _saveUserFCMToken(String userEmail) async {
-    try {
-      String? token = await _messaging.getToken();
-      if (token != null) {
-        await _firestore.collection('usuarios').doc(userEmail).update({
-          'fcmToken': token,
-          'tokenActualizacion': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      debugPrint('FCM: Error guardando token: $e');
-    }
-  }
-
   Future<void> _startUserServices(String userEmail) async {
-    await _saveUserFCMToken(userEmail);
     await _locationService.startLocationTracking();
   }
 
@@ -687,7 +582,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       borderRadius: BorderRadius.circular(25),
                       boxShadow: [
                         BoxShadow(
-                          color: content['gradient'][0].withOpacity(0.3),
+                          color: content['gradient'][0].withValues(alpha: 0.3),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -752,7 +647,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       decoration: BoxDecoration(
                         color: index == _currentContentIndex
                             ? Colors.white
-                            : Colors.white.withOpacity(0.3),
+                            : Colors.white.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     );
@@ -770,14 +665,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     return Container(
       decoration: BoxDecoration(
         // Fondo semi-transparente para que se vea la animación
-        color: const Color(0xFF0F172A).withOpacity(0.85),
+        color: const Color(0xFF0F172A).withValues(alpha: 0.85),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(32),
           topRight: Radius.circular(32),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),
@@ -789,7 +684,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           Container(
             margin: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B).withOpacity(0.8),
+              color: const Color(0xFF1E293B).withValues(alpha: 0.8),
               borderRadius: BorderRadius.circular(16),
             ),
             child: TabBar(
@@ -985,7 +880,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4285F4).withOpacity(0.3),
+            color: const Color(0xFF4285F4).withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -1044,14 +939,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         hintStyle: TextStyle(color: Colors.grey.shade500),
         prefixIcon: Icon(icon, color: Colors.grey.shade500),
         filled: true,
-        fillColor: const Color(0xFF1E293B).withOpacity(0.7),
+        fillColor: const Color(0xFF1E293B).withValues(alpha: 0.7),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.shade800.withOpacity(0.5)),
+          borderSide: BorderSide(color: Colors.grey.shade800.withValues(alpha: 0.5)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -1082,7 +977,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF3B82F6).withOpacity(0.3),
+            color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -1090,6 +985,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       ),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
         child: isLoading
             ? const CircularProgressIndicator(
                 color: Colors.white,
@@ -1103,13 +1005,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   color: Colors.white,
                 ),
               ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
       ),
     );
   }
@@ -1117,7 +1012,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildDivider() {
     return Row(
       children: [
-        Expanded(child: Divider(color: Colors.grey.shade700.withOpacity(0.5))),
+        Expanded(child: Divider(color: Colors.grey.shade700.withValues(alpha: 0.5))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
@@ -1128,7 +1023,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             ),
           ),
         ),
-        Expanded(child: Divider(color: Colors.grey.shade700.withOpacity(0.5))),
+        Expanded(child: Divider(color: Colors.grey.shade700.withValues(alpha: 0.5))),
       ],
     );
   }
@@ -1139,20 +1034,20 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF3B82F6).withOpacity(0.1),
-            const Color(0xFF1D4ED8).withOpacity(0.1),
+            const Color(0xFF3B82F6).withValues(alpha: 0.1),
+            const Color(0xFF1D4ED8).withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF3B82F6).withOpacity(0.3),
+          color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.info_outline,
-            color: const Color(0xFF3B82F6),
+            color: Color(0xFF3B82F6),
             size: 20,
           ),
           const SizedBox(width: 12),

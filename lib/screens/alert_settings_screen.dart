@@ -19,6 +19,7 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   String? _userEmail;
+  String? _errorMessage; // Para manejar errores sin usar ScaffoldMessenger en initState
 
   final List<String> _sensibilidadOptions = ['Bajo', 'Medio', 'Alto'];
   final Map<String, String> _sensibilidadDescriptions = {
@@ -42,30 +43,43 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _getCurrentUser();
+    // Usar Future.delayed para ejecutar después de que el widget esté completamente inicializado
+    Future.delayed(Duration.zero, () {
+      _getCurrentUser();
+    });
   }
 
   Future<void> _getCurrentUser() async {
-    // Intentar obtener usuario de Firebase Auth (Google Sign-In)
-    User? firebaseUser = _auth.currentUser;
-    if (firebaseUser != null) {
-      _userEmail = firebaseUser.email;
-    } else {
-      // Si no hay usuario de Firebase Auth, necesitamos obtenerlo de otra manera
-      // Por ahora, mostraremos un error o pediremos que se vuelva a loguear
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo identificar el usuario. Por favor, inicia sesión nuevamente.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        Navigator.of(context).pop();
+    try {
+      // Intentar obtener usuario de Firebase Auth (Google Sign-In)
+      User? firebaseUser = _auth.currentUser;
+      if (firebaseUser != null) {
+        _userEmail = firebaseUser.email;
+        await _loadUserConfig();
+      } else {
+        // Si no hay usuario de Firebase Auth, manejar el error
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'No se pudo identificar el usuario. Por favor, inicia sesión nuevamente.';
+            _isLoading = false;
+          });
+          // Navegar de vuelta después de mostrar el error
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.of(context).pop();
+            }
+          });
+        }
+        return;
       }
-      return;
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error al obtener información del usuario: $e';
+          _isLoading = false;
+        });
+      }
     }
-    
-    await _loadUserConfig();
   }
 
   Future<void> _loadUserConfig() async {
@@ -88,25 +102,15 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
       } else if (mounted) {
         setState(() {
           _isLoading = false;
+          _errorMessage = 'No se encontró la configuración del usuario';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se encontró la configuración del usuario'),
-            backgroundColor: Colors.orange,
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _errorMessage = 'Error al cargar configuración: $e';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar configuración: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -133,10 +137,12 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 8),
-                Text(
-                  _notificacionesActivas 
-                    ? 'Configuración guardada. Recibirás alertas en un radio de ${_formatDistance(_radioAlerta)}'
-                    : 'Configuración guardada. Las alertas están desactivadas'
+                Expanded(
+                  child: Text(
+                    _notificacionesActivas 
+                      ? 'Configuración guardada. Recibirás alertas en un radio de ${_formatDistance(_radioAlerta)}'
+                      : 'Configuración guardada. Las alertas están desactivadas'
+                  ),
                 ),
               ],
             ),
@@ -228,6 +234,22 @@ class _AlertSettingsScreenState extends State<AlertSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Mostrar error si existe usando addPostFrameCallback
+    if (_errorMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_errorMessage!),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        setState(() {
+          _errorMessage = null; // Limpiar el error después de mostrarlo
+        });
+      });
+    }
+
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(

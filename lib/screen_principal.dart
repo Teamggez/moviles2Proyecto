@@ -2,15 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
-import '../services/custom_heatmap.dart';
-import '../services/location_service.dart';
-import '../widgets/barralateral.dart';
-import '../widgets/LeyendaMapa.dart';
-import '../widgets/alternar_boton.dart';
-import '../widgets/botonEmergencia.dart';
+import 'services/custom_heatmap.dart';
+import 'services/location_service.dart';
+import 'services/auth_service.dart';
+import 'widgets/barralateral.dart';
+import 'widgets/LeyendaMapa.dart';
+import 'widgets/alternar_boton.dart';
+import 'widgets/botonEmergencia.dart';
 import 'screenRutaSegura.dart';
 
 class ScreenPrincipal extends StatefulWidget {
@@ -30,8 +29,9 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
 
   // Servicios
   final LocationService _locationService = LocationService();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  // Eliminar estas líneas:
+  //final FirebaseAuth _auth = FirebaseAuth.instance;
+  //final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   static const CameraPosition _kInitialPosition = CameraPosition(
     target: LatLng(-18.0146, -70.2534),
@@ -204,11 +204,8 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
         // Detener servicios
         _locationService.stopLocationTracking();
 
-        // Cerrar sesión de Firebase Auth
-        await _auth.signOut();
-
-        // Cerrar sesión de Google Sign-In
-        await _googleSignIn.signOut();
+        // Cerrar sesión usando AuthService
+        await AuthService.signOut();
 
         if (mounted) {
           // Cerrar el diálogo de carga
@@ -216,7 +213,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
 
           // Navegar a la pantalla de login y limpiar el stack
           Navigator.of(context).pushNamedAndRemoveUntil(
-            '/',
+            '/login',
             (route) => false,
           );
         }
@@ -280,11 +277,11 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
               child: Builder(
                 builder: (context) => Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withAlpha((0.85 * 255).round()),
+                    color: Colors.white.withValues(alpha: 0.85),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withAlpha((0.2 * 255).round()),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
@@ -306,11 +303,11 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             child: SafeArea(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha((0.85 * 255).round()),
+                  color: Colors.white.withValues(alpha: 0.85),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withAlpha((0.2 * 255).round()),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 5,
                         offset: const Offset(0, 2)),
                   ],
@@ -330,11 +327,11 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
             child: SafeArea(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha((0.85 * 255).round()),
+                  color: Colors.white.withValues(alpha: 0.85),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha((0.2 * 255).round()),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 5,
                       offset: const Offset(0, 2),
                     ),
@@ -375,7 +372,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withAlpha((0.2 * 255).round()),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 5,
                         offset: const Offset(0, 2)),
                   ],
@@ -415,7 +412,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha((0.2 * 255).round()),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 5,
                       offset: const Offset(0, 2),
                     ),
@@ -436,7 +433,7 @@ class _ScreenPrincipalState extends State<ScreenPrincipal> {
               child: GestureDetector(
                 onTap: _closeLeyenda,
                 child: Container(
-                  color: Colors.black.withAlpha((0.6 * 255).round()),
+                  color: Colors.black.withValues(alpha: 0.6),
                   child: Center(
                     child: LeyendaMapa(
                       onClose: _closeLeyenda,
