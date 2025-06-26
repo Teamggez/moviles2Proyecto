@@ -1,7 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'services/location_service.dart';
 import 'services/notification_service.dart';
 import 'services/auth_service.dart';
@@ -152,6 +154,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   ];
   int _currentContentIndex = 0;
 
+  final Uri _privacyPolicyUrl = Uri.parse('https://sites.google.com/view/mundotechdevs-alerta-tacna/');
+  final Uri _termsUrl = Uri.parse('https://sites.google.com/view/alerta-tacna-termofuse/');
+  final Uri _deleteAccountUrl = Uri.parse('https://sites.google.com/view/eliminarcuentaalerta/p%C3%A1gina-principal');
+
+
   @override
   void initState() {
     super.initState();
@@ -197,6 +204,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _emailRegisterController.dispose();
     _passwordRegisterController.dispose();
     super.dispose();
+  }
+  
+  Future<void> _launchUrl(Uri url) async {
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      _showErrorSnackBar('No se pudo abrir el enlace.');
+    }
   }
 
   Future<void> _login() async {
@@ -440,6 +453,54 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             ),
           ),
           Expanded(child: TabBarView(controller: _tabController, children: [_buildLoginForm(), _buildRegisterForm(),],),),
+          _buildLegalLinks(context),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildLegalLinks(BuildContext context) {
+    final linkStyle = TextStyle(
+      color: Colors.blue.shade300,
+      fontWeight: FontWeight.w500,
+      decoration: TextDecoration.underline,
+      decorationColor: Colors.blue.shade300,
+    );
+  
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        runSpacing: 4,
+        spacing: 8,
+        children: <Widget>[
+          Text.rich(
+            textAlign: TextAlign.center,
+            TextSpan(
+              text: 'Al continuar, aceptas nuestra ',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              children: <TextSpan>[
+                TextSpan(
+                  text: 'Politica de Privacidad',
+                  style: linkStyle,
+                  recognizer: TapGestureRecognizer()..onTap = () => _launchUrl(_privacyPolicyUrl),
+                ),
+                const TextSpan(text: ' y nuestros '),
+                TextSpan(
+                  text: 'Terminos y Condiciones',
+                  style: linkStyle,
+                  recognizer: TapGestureRecognizer()..onTap = () => _launchUrl(_termsUrl),
+                ),
+                const TextSpan(text: '. '),
+                 TextSpan(
+                  text: 'Eliminar mi cuenta.',
+                  style: linkStyle,
+                  recognizer: TapGestureRecognizer()..onTap = () => _launchUrl(_deleteAccountUrl),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
